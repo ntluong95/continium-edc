@@ -1,0 +1,79 @@
+---
+title: Enterprise License Server
+description: Run the local license server and issue a development Enterprise key
+icon: "file-certificate"
+---
+
+Use this flow when you need to test Enterprise-gated features locally.
+
+## Start infrastructure
+
+```bash
+pnpm db:up
+```
+
+The dev compose file starts:
+
+- `postgres` on `localhost:5432` for the main Continium app
+- `license-postgres` on `localhost:5434` for license-server data
+- `valkey` on `localhost:6379` for rate limiting and revoke-cache state
+
+## Configure the license server
+
+Copy the local example and keep the license database separate from the app database:
+
+```bash
+cp apps/license-server/.env.local.example apps/license-server/.env.local
+```
+
+If you run the license server through `pnpm go` or `pnpm dev`, also add the same required values to the repository root `.env` because Turbo starts workspace tasks from the root environment:
+
+```bash
+LICENSE_DATABASE_URL=postgresql://license:license@localhost:5434/continium_licenses?schema=public
+CONTINIUM_LICENSE_ADMIN_TOKEN=dev-token-32chars-do-not-use-in-prod
+REDIS_URL=redis://localhost:6379
+TZ=UTC
+PGTZ=UTC
+```
+
+## Run database migrations
+
+```bash
+pnpm --filter @continium/license-server db:migrate:dev
+```
+
+For production or CI deployments, use:
+
+```bash
+pnpm --filter @continium/license-server db:migrate:deploy
+```
+
+## Start the license server
+
+```bash
+pnpm --filter @continium/license-server dev
+```
+
+The health endpoint should respond at [http://localhost:3100/api/health](http://localhost:3100/api/health).
+
+## Issue a local Enterprise key
+
+```bash
+export CONTINIUM_LICENSE_SERVER_URL=http://localhost:3100
+export CONTINIUM_LICENSE_ADMIN_TOKEN=dev-token-32chars-do-not-use-in-prod
+
+pnpm --filter @continium/license-generator dev -- issue \
+  --customer local-dev \
+  --email dev@example.com \
+  --edition enterprise \
+  --features "sso=true,contacts=true,projects=100,whitelabel=true,removeBranding=true,twoFactorAuth=true,saml=true,auditLogs=true"
+```
+
+The CLI prints the raw license key once. Add it to the repository root `.env` with the local server URL:
+
+```bash
+CONTINIUM_LICENSE_SERVER_URL=http://localhost:3100
+ENTERPRISE_LICENSE_KEY=CLN-...
+```
+
+Restart `apps/web` after changing `.env`, then use the Enterprise settings page to recheck the license.

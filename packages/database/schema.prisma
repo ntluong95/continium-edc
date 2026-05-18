@@ -1,0 +1,1633 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+generator json {
+  provider = "prisma-json-types-generator"
+}
+
+/// Represents an attribute value associated with a contact.
+/// Used to store custom properties and characteristics of contacts.
+///
+/// @property id - Unique identifier for the attribute
+/// @property attributeKey - Reference to the attribute definition
+/// @property contact - The contact this attribute belongs to
+/// @property value - The string value of the attribute (used for string type + backwards compatibility)
+/// @property valueNumber - Native numeric storage for number type attributes
+/// @property valueDate - Native date storage for date type attributes
+model ContactAttribute {
+  id             String              @id @default(cuid())
+  createdAt      DateTime            @default(now()) @map(name: "created_at")
+  updatedAt      DateTime            @updatedAt @map(name: "updated_at")
+  attributeKey   ContactAttributeKey @relation(fields: [attributeKeyId], references: [id], onDelete: Cascade)
+  attributeKeyId String
+  contact        Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId      String
+  value          String
+  valueNumber    Float?
+  valueDate      DateTime?
+
+  @@unique([contactId, attributeKeyId])
+  @@index([attributeKeyId, value])
+  @@index([attributeKeyId, valueNumber])
+  @@index([attributeKeyId, valueDate])
+}
+
+enum ContactAttributeType {
+  default
+  custom
+}
+
+enum ContactAttributeDataType {
+  string
+  number
+  date
+}
+
+/// Defines the possible attributes that can be assigned to contacts.
+/// Acts as a schema for contact attributes within an environment.
+///
+/// @property id - Unique identifier for the attribute key
+/// @property isUnique - Whether the attribute must have unique values across contacts
+/// @property key - The attribute identifier used in the system
+/// @property name - Display name for the attribute
+/// @property type - Whether this is a default or custom attribute
+/// @property dataType - The data type of the attribute (string, number, date)
+/// @property environment - The environment this attribute belongs to
+model ContactAttributeKey {
+  id               String                   @id @default(cuid())
+  createdAt        DateTime                 @default(now()) @map(name: "created_at")
+  updatedAt        DateTime                 @updatedAt @map(name: "updated_at")
+  isUnique         Boolean                  @default(false)
+  key              String
+  name             String?
+  description      String?
+  type             ContactAttributeType     @default(custom)
+  dataType         ContactAttributeDataType @default(string)
+  environment      Environment              @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId    String
+  attributes       ContactAttribute[]
+  attributeFilters SurveyAttributeFilter[]
+
+  @@unique([key, environmentId])
+  @@index([environmentId, createdAt])
+}
+
+/// Represents a person or user who can receive and respond to surveys.
+/// Contacts are environment-specific and can have multiple attributes and responses.
+///
+/// @property id - Unique identifier for the contact
+/// @property environment - The environment this contact belongs to
+/// @property responses - Survey responses from this contact
+/// @property attributes - Custom attributes associated with this contact
+/// @property displays - Record of surveys shown to this contact
+model Contact {
+  id            String             @id @default(cuid())
+  createdAt     DateTime           @default(now()) @map(name: "created_at")
+  updatedAt     DateTime           @updatedAt @map(name: "updated_at")
+  environment   Environment        @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId String
+  responses     Response[]
+  attributes    ContactAttribute[]
+  displays      Display[]
+  subjects      Subject[]
+
+  @@index([environmentId])
+}
+
+/// Stores a user's response to a survey, including their answers and metadata.
+/// Each response is linked to a specific survey and optionally to a contact.
+///
+/// @property id - Unique identifier for the response
+/// @property finished - Whether the survey was completed
+/// @property survey - The associated survey
+/// @property contact - The optional contact who provided the response
+/// @property data - JSON object containing the actual response data
+/// @property variables - Custom variables used in the response
+/// @property ttc - Time to completion metrics
+/// @property meta - Additional metadata about the response
+model Response {
+  id                String              @id @default(cuid())
+  createdAt         DateTime            @default(now()) @map(name: "created_at")
+  updatedAt         DateTime            @default(now()) @updatedAt @map(name: "updated_at")
+  finished          Boolean             @default(false)
+  survey            Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId          String
+  contact           Contact?            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId         String?
+  endingId          String?
+  /// [ResponseData]
+  data              Json                @default("{}")
+  /// [ResponseVariables]
+  variables         Json                @default("{}")
+  /// [ResponseTtc]
+  ttc               Json                @default("{}")
+  /// [ResponseMeta]
+  meta              Json                @default("{}")
+  tags              TagsOnResponses[]
+  quotaLinks        ResponseQuotaLink[]
+  /// [ResponseContactAttributes]
+  contactAttributes Json?
+  // singleUseId, used to prevent multiple responses
+  singleUseId       String?
+  language          String?
+  displayId         String?             @unique
+  display           Display?            @relation(fields: [displayId], references: [id])
+  clinicalRecord    Record?             @relation("ClinicalRecordResponse")
+
+  @@unique([surveyId, singleUseId])
+  @@index([createdAt])
+  @@index([surveyId, createdAt]) // to determine monthly response count
+  @@index([contactId, createdAt]) // to determine monthly identified users (persons)
+}
+
+/// Represents a label that can be applied to survey responses.
+/// Used for categorizing and organizing responses within an environment.
+///
+/// @property id - Unique identifier for the tag
+/// @property name - Display name of the tag
+/// @property responses - Survey responses tagged with this label
+/// @property environment - The environment this tag belongs to
+model Tag {
+  id            String            @id @default(cuid())
+  createdAt     DateTime          @default(now()) @map(name: "created_at")
+  updatedAt     DateTime          @updatedAt @map(name: "updated_at")
+  name          String
+  responses     TagsOnResponses[]
+  environmentId String
+  environment   Environment       @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@unique([environmentId, name])
+}
+
+/// Junction table linking tags to responses.
+/// Enables many-to-many relationship between tags and responses.
+///
+/// @property response - The tagged response
+/// @property tag - The tag applied to the response
+model TagsOnResponses {
+  responseId String
+  response   Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([responseId, tagId])
+}
+
+enum SurveyStatus {
+  draft
+  inProgress
+  paused
+  completed
+}
+
+/// Records when a survey is shown to a user.
+/// Tracks survey display history and response status.
+///
+/// @property id - Unique identifier for the display event
+/// @property survey - The survey that was displayed
+/// @property contact - The contact who saw the survey
+/// @property response - The associated response if one exists
+model Display {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now()) @map(name: "created_at")
+  updatedAt DateTime  @updatedAt @map(name: "updated_at")
+  survey    Survey    @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId  String
+  contact   Contact?  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId String?
+  response  Response?
+
+  @@index([surveyId])
+  @@index([contactId, createdAt])
+}
+
+/// Links surveys to specific trigger actions.
+/// Defines which user actions should cause a survey to be displayed.
+/// This is the connection table between Surveys and ActionClasses that determines
+/// when and under what conditions a survey should be triggered.
+///
+/// @property id - Unique identifier for the trigger
+/// @property survey - The survey to be triggered
+/// @property actionClass - The action that triggers the survey
+/// @property createdAt - When the trigger was created
+/// @property updatedAt - When the trigger was last modified
+model SurveyTrigger {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now()) @map(name: "created_at")
+  updatedAt     DateTime    @updatedAt @map(name: "updated_at")
+  survey        Survey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId      String
+  actionClass   ActionClass @relation(fields: [actionClassId], references: [id], onDelete: Cascade)
+  actionClassId String
+
+  @@unique([surveyId, actionClassId])
+}
+
+enum SurveyAttributeFilterCondition {
+  equals
+  notEquals
+}
+
+enum SurveyQuotaAction {
+  endSurvey
+  continueSurvey
+}
+
+enum ResponseQuotaLinkStatus {
+  screenedIn
+  screenedOut
+}
+
+/// Defines targeting rules for surveys based on contact attributes.
+/// Used to show surveys only to contacts matching specific criteria.
+///
+/// @property id - Unique identifier for the filter
+/// @property attributeKey - The contact attribute to filter on
+/// @property survey - The survey being filtered
+/// @property condition - The comparison operator to use
+/// @property value - The value to compare against
+model SurveyAttributeFilter {
+  id             String                         @id @default(cuid())
+  createdAt      DateTime                       @default(now()) @map(name: "created_at")
+  updatedAt      DateTime                       @updatedAt @map(name: "updated_at")
+  attributeKey   ContactAttributeKey            @relation(fields: [attributeKeyId], references: [id], onDelete: Cascade)
+  attributeKeyId String
+  survey         Survey                         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId       String
+  condition      SurveyAttributeFilterCondition
+  value          String
+
+  @@unique([surveyId, attributeKeyId])
+  @@index([attributeKeyId])
+}
+
+enum SurveyType {
+  link
+  app
+}
+
+enum displayOptions {
+  displayOnce
+  displayMultiple
+  displaySome
+  respondMultiple
+}
+
+enum SurveyScriptMode {
+  add
+  replace
+}
+
+/// Represents a complete survey configuration including questions, styling, and display rules.
+/// Core model for the survey functionality in Continium.
+///
+/// @property id - Unique identifier for the survey
+/// @property name - Display name of the survey
+/// @property type - Survey delivery method (link, web, website, app)
+/// @property status - Current state of the survey (draft, active, completed, etc)
+/// @property environment - The environment this survey belongs to
+/// @property questions - JSON array containing survey questions configuration
+/// @property displayOption - Rules for how often the survey can be shown
+/// @property triggers - Actions that can trigger this survey
+/// @property attributeFilters - Rules for targeting specific contacts
+/// @property customHeadScripts - Survey-specific custom HTML scripts (self-hosted only)
+/// @property customHeadScriptsMode - "add" (merge with project) or "replace" (override project)
+model Survey {
+  id                  String                  @id @default(cuid())
+  createdAt           DateTime                @default(now()) @map(name: "created_at")
+  updatedAt           DateTime                @updatedAt @map(name: "updated_at")
+  name                String
+  redirectUrl         String?
+  type                SurveyType              @default(app)
+  environment         Environment             @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId       String
+  creator             User?                   @relation(fields: [createdBy], references: [id])
+  createdBy           String?
+  status              SurveyStatus            @default(draft)
+  /// [SurveyWelcomeCard]
+  welcomeCard         Json                    @default("{\"enabled\": false}")
+  /// [SurveyQuestions]
+  questions           Json                    @default("[]")
+  /// [SurveyBlocks]
+  blocks              Json[]                  @default([])
+  /// [SurveyEnding]
+  endings             Json[]                  @default([])
+  /// [SurveyHiddenFields]
+  hiddenFields        Json                    @default("{\"enabled\": false}")
+  /// [SurveyVariables]
+  variables           Json                    @default("[]")
+  responses           Response[]
+  quotas              SurveyQuota[]
+  displayOption       displayOptions          @default(displayOnce)
+  recontactDays       Int?
+  displayLimit        Int?
+  triggers            SurveyTrigger[]
+  /// [SurveyInlineTriggers]
+  inlineTriggers      Json?
+  attributeFilters    SurveyAttributeFilter[]
+  displays            Display[]
+  autoClose           Int?
+  autoComplete        Int?
+  delay               Int                     @default(0)
+  /// [SurveyClosedMessage]
+  surveyClosedMessage Json?
+  segmentId           String?
+  segment             Segment?                @relation(fields: [segmentId], references: [id])
+
+  /// [SurveyProjectOverwrites]
+  projectOverwrites Json?
+
+  /// [SurveyStyling]
+  styling Json?
+
+  /// [SurveySingleUse]
+  singleUse Json? @default("{\"enabled\": false, \"isEncrypted\": true}")
+
+  isVerifyEmailEnabled            Boolean          @default(false)
+  isSingleResponsePerEmailEnabled Boolean          @default(false)
+  isBackButtonHidden              Boolean          @default(false)
+  isAutoProgressingEnabled        Boolean          @default(false)
+  isCaptureIpEnabled              Boolean          @default(false)
+  pin                             String?
+  displayPercentage               Decimal?
+  languages                       SurveyLanguage[]
+  showLanguageSwitch              Boolean?
+  followUps                       SurveyFollowUp[]
+  instruments                     Instrument[]
+  /// [SurveyRecaptcha]
+  recaptcha                       Json?            @default("{\"enabled\": false, \"threshold\":0.1}")
+  /// [SurveyLinkMetadata]
+  metadata                        Json             @default("{}")
+
+  slug String? @unique
+
+  customHeadScripts     String?
+  customHeadScriptsMode SurveyScriptMode? @default(add)
+
+  @@index([environmentId, updatedAt])
+  @@index([segmentId])
+}
+
+/// Represents a quota configuration for a survey.
+/// Defines response limits and conditions for quota management.
+///
+/// @property id - Unique identifier for the quota
+/// @property survey - The survey this quota belongs to
+/// @property name - Display name for the quota
+/// @property limit - Maximum number of responses allowed
+/// @property conditions - JSON object containing quota conditions
+/// @property action - Action to take when quota is reached
+/// @property endingCardId - Optional ending card to show when quota is reached
+model SurveyQuota {
+  id                      String              @id @default(cuid())
+  createdAt               DateTime            @default(now()) @map(name: "created_at")
+  updatedAt               DateTime            @updatedAt @map(name: "updated_at")
+  survey                  Survey              @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId                String
+  name                    String
+  limit                   Int
+  /// [SurveyQuotaLogic]
+  logic                   Json                @default("{}")
+  action                  SurveyQuotaAction
+  endingCardId            String?
+  quotaLinks              ResponseQuotaLink[]
+  countPartialSubmissions Boolean             @default(false)
+
+  @@unique([surveyId, name])
+}
+
+/// Junction table linking responses to quotas.
+/// Tracks which responses counted towards specific quotas and their status.
+///
+/// @property response - The response that counted towards the quota
+/// @property quota - The quota this response counted towards
+/// @property status - Whether the response was screened in or out
+model ResponseQuotaLink {
+  response   Response                @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  responseId String
+  quota      SurveyQuota             @relation(fields: [quotaId], references: [id], onDelete: Cascade)
+  quotaId    String
+  status     ResponseQuotaLinkStatus
+
+  @@id([responseId, quotaId])
+  @@index([quotaId, status])
+}
+
+/// Defines follow-up actions for survey responses.
+/// Enables automated actions based on specific survey response conditions.
+///
+/// @property id - Unique identifier for the follow-up
+/// @property survey - The associated survey
+/// @property name - Display name for the follow-up
+/// @property trigger - Conditions that activate the follow-up
+/// @property action - Actions to take when triggered
+model SurveyFollowUp {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map(name: "created_at")
+  updatedAt DateTime @updatedAt @map(name: "updated_at")
+  survey    Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId  String
+  name      String
+  /// [SurveyFollowUpTrigger]
+  trigger   Json
+  /// [SurveyFollowUpAction]
+  action    Json
+}
+
+enum ActionType {
+  code
+  noCode
+}
+
+/// Represents a user action that can trigger surveys.
+/// Used to define points in the user journey where surveys can be shown.
+///
+/// @property id - Unique identifier for the action
+/// @property name - Display name of the action
+/// @property type - Whether this is a code or no-code action
+/// @property key - Unique identifier used in code implementation
+/// @property noCodeConfig - Configuration for no-code setup
+/// @property environment - The environment this action belongs to
+model ActionClass {
+  id             String          @id @default(cuid())
+  createdAt      DateTime        @default(now()) @map(name: "created_at")
+  updatedAt      DateTime        @updatedAt @map(name: "updated_at")
+  name           String
+  description    String?
+  type           ActionType
+  key            String?
+  /// [ActionClassNoCodeConfig]
+  noCodeConfig   Json?
+  environment    Environment     @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId  String
+  surveyTriggers SurveyTrigger[]
+
+  @@unique([key, environmentId])
+  @@unique([name, environmentId])
+  @@index([environmentId, createdAt])
+}
+
+enum EnvironmentType {
+  production
+  development
+}
+
+enum PipelineTriggers {
+  responseCreated
+  responseUpdated
+  responseFinished
+}
+
+enum WebhookSource {
+  user
+  zapier
+  make
+  n8n
+  activepieces
+}
+
+enum IntegrationType {
+  googleSheets
+  notion
+  airtable
+  slack
+}
+
+enum DataMigrationStatus {
+  pending
+  applied
+  failed
+}
+
+/// Tracks database schema migrations.
+/// Used to manage and track the state of data structure changes.
+///
+/// @property id - Unique identifier for the migration
+/// @property name - Name of the migration
+/// @property status - Current state of the migration (pending, applied, failed)
+/// @property startedAt - When the migration began
+/// @property finishedAt - When the migration completed
+model DataMigration {
+  id         String              @id @default(cuid())
+  startedAt  DateTime            @default(now()) @map(name: "started_at")
+  finishedAt DateTime?           @map(name: "finished_at")
+  name       String              @unique
+  status     DataMigrationStatus
+}
+
+/// Represents either a production or development environment within a project.
+/// Each project has exactly two environments, serving as the main reference point
+/// for most Continium resources including surveys and actions.
+///
+/// @property id - Unique identifier for the environment
+/// @property type - Either 'production' or 'development'
+/// @property project - Reference to parent project
+/// @property surveys - Collection of surveys in this environment
+/// @property contacts - Collection of contacts/users tracked
+/// @property actionClasses - Defined actions that can trigger surveys
+/// @property attributeKeys - Custom attributes configuration
+model Environment {
+  id                String                @id @default(cuid())
+  createdAt         DateTime              @default(now()) @map(name: "created_at")
+  updatedAt         DateTime              @updatedAt @map(name: "updated_at")
+  type              EnvironmentType
+  project           Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId         String
+  appSetupCompleted Boolean               @default(false)
+  surveys           Survey[]
+  contacts          Contact[]
+  actionClasses     ActionClass[]
+  attributeKeys     ContactAttributeKey[]
+  webhooks          Webhook[]
+  tags              Tag[]
+  segments          Segment[]
+  integration       Integration[]
+  ApiKeyEnvironment ApiKeyEnvironment[]
+
+  @@index([projectId])
+}
+
+/// Represents a webhook endpoint for receiving survey-related events.
+model Webhook {
+  id            String             @id @default(cuid())
+  name          String?
+  createdAt     DateTime           @default(now()) @map(name: "created_at")
+  updatedAt     DateTime           @default(now()) @updatedAt @map(name: "updated_at")
+  url           String
+  source        WebhookSource      @default(user)
+  environment   Environment        @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  environmentId String
+  triggers      PipelineTriggers[]
+  surveyIds     String[]
+  secret        String?
+
+  @@index([environmentId])
+}
+
+/// Represents third-party service integrations (Google Sheets, Notion, Airtable, Slack).
+model Integration {
+  id            String          @id @default(cuid())
+  type          IntegrationType
+  environmentId String
+  /// [IntegrationConfig]
+  config        Json
+  environment   Environment     @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@unique([type, environmentId])
+  @@index([environmentId])
+}
+
+/// Distinguishes product-survey projects from regulated clinical EDC projects.
+/// One-way toggle in v1: PRODUCT → CLINICAL only (reverse deferred pending data-safety tooling).
+enum ProjectKind {
+  PRODUCT // Standard survey/CX product
+  CLINICAL // Default EDC mode: study arms, subjects, instruments, full audit trail
+}
+
+enum WidgetPlacement {
+  bottomLeft
+  bottomRight
+  topLeft
+  topRight
+  center
+}
+
+enum SurveyOverlay {
+  none
+  light
+  dark
+}
+
+/// Main grouping mechanism for resources in Continium.
+/// Each organization can have multiple projects to separate different applications or products.
+///
+/// @property id - Unique identifier for the project
+/// @property name - Display name of the project
+/// @property organization - Reference to parent organization
+/// @property environments - Development and production environments
+/// @property styling - Project-wide styling configuration
+/// @property config - Project-specific configuration
+/// @property recontactDays - Default recontact delay for surveys
+/// @property placement - Default widget placement for in-app surveys
+model Project {
+  id                  String                     @id @default(cuid())
+  createdAt           DateTime                   @default(now()) @map(name: "created_at")
+  updatedAt           DateTime                   @updatedAt @map(name: "updated_at")
+  name                String
+  organization        Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId      String
+  environments        Environment[]
+  /// [Styling]
+  styling             Json                       @default("{\"allowStyleOverwrite\":true}")
+  /// [ProjectConfig]
+  config              Json                       @default("{}")
+  recontactDays       Int                        @default(7)
+  linkSurveyBranding  Boolean                    @default(true) // Determines if the survey branding should be displayed in link surveys
+  inAppSurveyBranding Boolean                    @default(true) // Determines if the survey branding should be displayed in in-app surveys
+  placement           WidgetPlacement            @default(bottomRight)
+  clickOutsideClose   Boolean                    @default(true)
+  overlay             SurveyOverlay              @default(none)
+  languages           Language[]
+  /// [Logo]
+  logo                Json?
+  projectTeams        ProjectTeam[]
+  customHeadScripts   String? // Custom HTML scripts for link surveys (self-hosted only)
+  /// Distinguishes product-survey projects from regulated clinical EDC projects.
+  /// One-way toggle in v1: PRODUCT → CLINICAL (reverse deferred).
+  kind                ProjectKind                @default(CLINICAL) @map("kind")
+  study               Study?
+  clinicalOnboarding  ClinicalProjectOnboarding?
+
+  @@unique([organizationId, name])
+  @@index([organizationId, kind])
+}
+
+/// Represents the top-level organizational hierarchy in Continium.
+/// Self-hosting instances typically have a single organization, while Continium Cloud
+/// supports multiple organizations with multi-tenancy.
+///
+/// @property id - Unique identifier for the organization
+/// @property name - Display name of the organization
+/// @property memberships - User memberships within the organization
+/// @property projects - Collection of projects owned by the organization
+/// @property billing - JSON field containing billing information
+/// @property whitelabel - Whitelabel configuration for the organization
+/// @property isAISmartToolsEnabled - Controls access to AI smart tools (e.g. translations) that never touch collected data
+/// @property isAIDataAnalysisEnabled - Controls access to AI data analysis features that touch experience data
+model Organization {
+  id                      String               @id @default(cuid())
+  createdAt               DateTime             @default(now()) @map(name: "created_at")
+  updatedAt               DateTime             @updatedAt @map(name: "updated_at")
+  name                    String
+  memberships             Membership[]
+  projects                Project[]
+  billing                 OrganizationBilling?
+  /// [OrganizationWhitelabel]
+  whitelabel              Json                 @default("{}")
+  invites                 Invite[]
+  isAISmartToolsEnabled   Boolean              @default(false)
+  isAIDataAnalysisEnabled Boolean              @default(false)
+  teams                   Team[]
+  apiKeys                 ApiKey[]
+}
+
+/// Stores billing and Stripe synchronization data for an organization.
+///
+/// @property organizationId - Reference to the organization
+/// @property stripeCustomerId - Stripe customer ID for cloud billing
+/// @property limits - Plan limits used by feature and quota checks
+/// @property usageCycleAnchor - Stable anchor used to derive the current monthly usage cycle
+/// @property stripe - Stripe synchronization snapshot data
+model OrganizationBilling {
+  organizationId   String       @id @map(name: "organization_id")
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stripeCustomerId String?      @unique @map(name: "stripe_customer_id")
+  /// [OrganizationBillingPlanLimits]
+  limits           Json
+  usageCycleAnchor DateTime?    @map(name: "usage_cycle_anchor")
+  /// [OrganizationStripeBilling]
+  stripe           Json?
+  createdAt        DateTime     @default(now()) @map(name: "created_at")
+  updatedAt        DateTime     @updatedAt @map(name: "updated_at")
+}
+
+enum OrganizationRole {
+  owner
+  manager
+  member
+  billing
+}
+
+/// Links users to organizations with specific roles.
+/// Manages organization membership and permissions.
+/// Core model for managing user access within organizations.
+///
+/// @property organization - The organization the user belongs to
+/// @property user - The member user
+/// @property accepted - Whether the user has accepted the membership
+/// @property role - User's role within the organization (owner, manager, member, billing)
+model Membership {
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  accepted       Boolean          @default(false)
+  role           OrganizationRole @default(member)
+
+  @@id([userId, organizationId])
+  @@index([organizationId])
+}
+
+/// Represents pending invitations to join an organization.
+/// Used to manage the process of adding new users to an organization.
+/// Once accepted, invites are converted into memberships.
+///
+/// @property id - Unique identifier for the invite
+/// @property email - Email address of the invited user
+/// @property name - Optional display name for the invited user
+/// @property organization - The organization sending the invite
+/// @property creator - The user who created the invite
+/// @property acceptor - The user who accepted the invite (if accepted)
+/// @property expiresAt - When the invite becomes invalid
+/// @property role - Intended role for the invited user
+/// @property teamIds - Teams the user will be added to upon acceptance
+model Invite {
+  id             String           @id @default(uuid())
+  email          String
+  name           String?
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  creator        User             @relation("inviteCreatedBy", fields: [creatorId], references: [id])
+  creatorId      String
+  acceptor       User?            @relation("inviteAcceptedBy", fields: [acceptorId], references: [id], onDelete: Cascade)
+  acceptorId     String?
+  createdAt      DateTime         @default(now())
+  expiresAt      DateTime
+  role           OrganizationRole @default(member)
+  teamIds        String[]         @default([])
+
+  @@index([email, organizationId])
+  @@index([organizationId])
+}
+
+/// Represents enhanced API authentication keys with organization-level ownership.
+/// Used for authenticating API requests to Continium with more granular permissions.
+///
+/// @property id - Unique identifier for the API key
+/// @property label - Optional descriptive name for the key
+/// @property hashedKey - Securely stored API key
+/// @property organization - The organization this key belongs to
+/// @property createdBy - User ID who created this key
+/// @property lastUsedAt - Timestamp of last usage
+/// @property apiKeyEnvironments - Environments this key has access to
+model ApiKey {
+  id                 String              @id @default(cuid())
+  createdAt          DateTime            @default(now())
+  createdBy          String?
+  lastUsedAt         DateTime?
+  label              String
+  hashedKey          String
+  lookupHash         String?             @unique
+  organizationId     String
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKeyEnvironments ApiKeyEnvironment[]
+  /// [OrganizationAccess]
+  organizationAccess Json                @default("{}")
+
+  @@index([organizationId])
+}
+
+/// Defines permission levels for API keys.
+/// Controls what operations an API key can perform.
+enum ApiKeyPermission {
+  read
+  write
+  manage
+}
+
+/// Links API keys to environments with specific permissions.
+/// Enables granular access control for API keys across environments.
+///
+/// @property id - Unique identifier for the environment access entry
+/// @property apiKey - The associated API key
+/// @property environment - The environment being accessed
+/// @property permission - Level of access granted
+model ApiKeyEnvironment {
+  id            String           @id @default(cuid())
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  apiKeyId      String
+  apiKey        ApiKey           @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  environmentId String
+  environment   Environment      @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  permission    ApiKeyPermission
+
+  @@unique([apiKeyId, environmentId])
+  @@index([environmentId])
+}
+
+enum IdentityProvider {
+  email
+  github
+  google
+  azuread
+  openid
+  saml
+}
+
+/// Stores third-party authentication account information.
+/// Enables OAuth and other external authentication methods.
+///
+/// @property id - Unique identifier for the account
+/// @property user - The Continium user who owns this account
+/// @property provider - The authentication provider (GitHub, Google, etc.)
+/// @property providerAccountId - User ID from the provider
+/// @property access_token - OAuth access token
+/// @property refresh_token - OAuth refresh token
+model Account {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now()) @map(name: "created_at")
+  updatedAt         DateTime @updatedAt @map(name: "updated_at")
+  user              User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  access_token      String?  @db.Text
+  refresh_token     String?  @db.Text
+  expires_at        Int?
+  ext_expires_in    Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+/// Stores active authentication sessions for revocable server-side login state.
+///
+/// @property sessionToken - Opaque token stored in the browser cookie
+/// @property user - The Continium user who owns this session
+/// @property expires - Hard expiry for the session
+model Session {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now()) @map(name: "created_at")
+  updatedAt    DateTime @updatedAt @map(name: "updated_at")
+  sessionToken String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  expires      DateTime
+
+  @@index([userId])
+}
+
+/// Stores one-time verification tokens used by Auth.js adapter flows.
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/// Stores the active password reset token for a user.
+/// Tokens are opaque, hashed at rest, revocable, and single-use.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map(name: "created_at")
+  updatedAt DateTime @updatedAt @map(name: "updated_at")
+  tokenHash String   @unique @map(name: "token_hash")
+  expiresAt DateTime @map(name: "expires_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+
+  @@index([expiresAt])
+}
+
+/// Represents a user in the Continium system.
+/// Central model for user authentication and profile management.
+///
+/// @property id - Unique identifier for the user
+/// @property name - Display name of the user
+/// @property email - User's email address
+/// @property twoFactorEnabled - Whether 2FA is active
+/// @property memberships - Organizations the user belongs to
+/// @property notificationSettings - User's notification preferences
+model User {
+  id            String    @id @default(cuid())
+  createdAt     DateTime  @default(now()) @map(name: "created_at")
+  updatedAt     DateTime  @updatedAt @map(name: "updated_at")
+  name          String
+  email         String    @unique
+  emailVerified DateTime? @map(name: "email_verified")
+
+  twoFactorSecret           String?
+  twoFactorEnabled          Boolean                     @default(false)
+  backupCodes               String?
+  password                  String?
+  identityProvider          IdentityProvider            @default(email)
+  identityProviderAccountId String?
+  memberships               Membership[]
+  accounts                  Account[]
+  sessions                  Session[]
+  passwordResetToken        PasswordResetToken?
+  groupId                   String?
+  invitesCreated            Invite[]                    @relation("inviteCreatedBy")
+  invitesAccepted           Invite[]                    @relation("inviteAcceptedBy")
+  /// [UserNotificationSettings]
+  notificationSettings      Json                        @default("{}")
+  /// [Locale]
+  locale                    String                      @default("en-US")
+  surveys                   Survey[]
+  publishedInstruments      Instrument[]                @relation("publishedInstrumentUser")
+  lockedRecords             Record[]                    @relation("recordLockedByUser")
+  dagMemberships            DagMember[]
+  teamUsers                 TeamUser[]
+  lastLoginAt               DateTime?
+  isActive                  Boolean                     @default(true)
+  clinicalAccessRules       ClinicalAccessRule[]        @relation("ruleTargetUser")
+  createdClinicalRules      ClinicalAccessRule[]        @relation("ruleCreatedByUser")
+  clinicalOnboardingCreated ClinicalProjectOnboarding[] @relation("ClinicalProjectOnboardingCreatedBy")
+}
+
+/// Defines a segment of contacts based on attributes.
+/// Used for targeting surveys to specific user groups.
+///
+/// @property id - Unique identifier for the segment
+/// @property title - Display name of the segment
+/// @property filters - Rules defining the segment
+/// @property isPrivate - Whether the segment is private
+/// @property environment - The environment this segment belongs to
+model Segment {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now()) @map(name: "created_at")
+  updatedAt     DateTime    @updatedAt @map(name: "updated_at")
+  title         String
+  description   String?
+  isPrivate     Boolean     @default(true)
+  /// [SegmentFilter]
+  filters       Json        @default("[]")
+  environmentId String
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  surveys       Survey[]
+
+  @@unique([environmentId, title])
+}
+
+/// Represents a supported language in the system.
+/// Used for multilingual survey support.
+///
+/// @property id - Unique identifier for the language
+/// @property code - Language code (e.g., 'en-US')
+/// @property alias - Optional friendly name
+/// @property project - The project this language is enabled for
+model Language {
+  id              String           @id @default(cuid())
+  createdAt       DateTime         @default(now()) @map(name: "created_at")
+  updatedAt       DateTime         @updatedAt @map(name: "updated_at")
+  code            String
+  alias           String?
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId       String
+  surveyLanguages SurveyLanguage[]
+
+  @@unique([projectId, code])
+}
+
+/// Links surveys to their supported languages.
+/// Manages which languages are available for each survey.
+///
+/// @property language - The supported language
+/// @property survey - The associated survey
+/// @property default - Whether this is the default language
+/// @property enabled - Whether this language is currently active
+model SurveyLanguage {
+  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  languageId String
+  surveyId   String
+  survey     Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  default    Boolean  @default(false)
+  enabled    Boolean  @default(true)
+
+  @@id([languageId, surveyId])
+  @@index([surveyId])
+}
+
+/// Represents a team within an organization.
+/// Enables group-based access control and collaboration.
+///
+/// @property id - Unique identifier for the team
+/// @property name - Display name of the team
+/// @property organization - The parent organization
+/// @property teamUsers - Users who are part of this team
+/// @property projectTeams - Projects this team has access to
+model Team {
+  id             String        @id @default(cuid())
+  createdAt      DateTime      @default(now()) @map(name: "created_at")
+  updatedAt      DateTime      @updatedAt @map(name: "updated_at")
+  name           String
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamUsers      TeamUser[]
+  projectTeams   ProjectTeam[]
+
+  @@unique([organizationId, name])
+}
+
+enum TeamUserRole {
+  admin
+  contributor
+}
+
+/// Links users to teams with specific roles.
+/// Manages team membership and permissions.
+///
+/// @property team - The associated team
+/// @property user - The team member
+/// @property role - User's role within the team
+model TeamUser {
+  createdAt DateTime     @default(now()) @map(name: "created_at")
+  updatedAt DateTime     @updatedAt @map(name: "updated_at")
+  teamId    String
+  team      Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      TeamUserRole
+
+  @@id([teamId, userId])
+  @@index([userId])
+}
+
+enum ProjectTeamPermission {
+  read
+  readWrite
+  manage
+}
+
+/// Defines team access to specific projects.
+/// Manages project-level permissions for teams.
+///
+/// @property project - The accessed project
+/// @property team - The team receiving access
+/// @property permission - Level of access granted
+model ProjectTeam {
+  createdAt  DateTime              @default(now()) @map(name: "created_at")
+  updatedAt  DateTime              @updatedAt @map(name: "updated_at")
+  projectId  String
+  project    Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  teamId     String
+  team       Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  permission ProjectTeamPermission @default(read)
+
+  @@id([projectId, teamId])
+  @@index([teamId])
+}
+
+// ─── Audit ───────────────────────────────────────────────────────────────────
+
+/// All audit-relevant actions across the system.
+/// Ported from migration/redcap_modern_schema.prisma; extended with EDC events.
+enum AuditEvent {
+  USER_REGISTERED
+  USER_LOGIN
+  USER_LOGIN_FAILED
+  USER_LOGOUT
+  ORG_CREATED
+  ORG_MEMBER_ADDED
+  ORG_MEMBER_REMOVED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+  PROJECT_STATUS_CHANGED
+  PROJECT_KIND_CHANGED
+  FORM_CREATED
+  FORM_UPDATED
+  FORM_DELETED
+  FIELD_CREATED
+  FIELD_UPDATED
+  FIELD_DELETED
+  METADATA_PUBLISHED
+  RECORD_CREATED
+  RECORD_INSTANCE_ADDED
+  RECORD_UPDATED
+  RECORD_DELETED
+  RECORD_RESTORED
+  RECORD_VALUE_SET
+  RECORD_LOCKED
+  RECORD_UNLOCKED
+  RECORD_SIGNED
+  SURVEY_ENABLED
+  SURVEY_OPENED
+  SURVEY_CLOSED
+  SURVEY_SUBMITTED
+  PARTICIPANT_ADDED
+  PARTICIPANT_REMOVED
+  INVITATION_SENT
+  INVITATION_USED
+  ROLE_CREATED
+  ROLE_UPDATED
+  ROLE_DELETED
+  MEMBERSHIP_GRANTED
+  MEMBERSHIP_REVOKED
+  DAG_CREATED
+  DAG_UPDATED
+  DAG_DELETED
+  DAG_ASSIGNED
+  DAG_MEMBER_ADDED
+  DAG_MEMBER_REMOVED
+  REPORT_CREATED
+  REPORT_UPDATED
+  REPORT_RAN
+  RECORDS_EXPORTED
+  EXPORT_PHI_REDACTED
+  FILE_UPLOADED
+  FILE_DELETED
+  API_TOKEN_CREATED
+  API_TOKEN_REVOKED
+  PERMISSION_DENIED
+  // Clinical EDC — P1.1
+  STUDY_CREATED
+  STUDY_UPDATED
+  ARM_CREATED
+  ARM_UPDATED
+  ARM_DELETED
+  ARM_REORDERED
+  EVENT_CREATED
+  EVENT_UPDATED
+  EVENT_DELETED
+  EVENT_REORDERED
+  EVENT_INSTRUMENT_BOUND
+  EVENT_INSTRUMENT_UNBOUND
+  SUBJECT_CREATED
+  SUBJECT_CONTACT_LINKED
+  ENROLLMENT_CREATED
+  ENROLLMENT_TRANSITIONED
+  INSTRUMENT_DRAFTED
+  INSTRUMENT_PUBLISHED
+  INSTRUMENT_ARCHIVED
+  INSTRUMENT_CLONED
+  CLINICAL_ONBOARDING_COMPLETED
+  // Clinical EDC — P1.6 Read/View events
+  SUBJECT_ROSTER_VIEWED
+  SUBJECT_VIEWED
+  RECORDS_VIEWED
+  AUDIT_LOG_VIEWED
+  CLINICAL_ACCESS_RULE_CREATED
+  CLINICAL_ACCESS_RULE_UPDATED
+  CLINICAL_ACCESS_RULE_DELETED
+  /// Generic catch-all for Prisma middleware auto-instrumentation.
+  /// model + action stored in AuditLog.metadata as { prismaModel, prismaAction }.
+  /// Replaced by typed events as Phase 1 models gain explicit audit calls.
+  PRISMA_OPERATION
+}
+
+/// Append-only compliance audit trail partitioned monthly by occurredAt.
+/// Immutability enforced at DB level via trigger (UPDATE/DELETE raise exceptions).
+/// Composite PK (id, occurredAt) required by Postgres partitioned table constraints.
+/// No Prisma relations — actor/project stored as raw IDs to avoid FK constraints on
+/// partitioned tables, and to retain records after actor/project deletion.
+/// hash column reserved for Phase 4 tamper-evidence; null until then.
+model AuditLog {
+  id           String     @default(uuid()) @map("id")
+  occurredAt   DateTime   @default(now()) @map("occurred_at")
+  event        AuditEvent
+  actorId      String?    @map("actor_id")
+  actorIp      String?    @map("actor_ip")
+  userAgent    String?    @map("user_agent")
+  projectId    String?    @map("project_id")
+  resourceId   String?    @map("resource_id")
+  resourceType String?    @map("resource_type")
+  diff         Json?
+  metadata     Json?
+  hash         String?
+
+  @@id([id, occurredAt])
+  @@index([projectId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@index([resourceId, occurredAt])
+  @@index([event, occurredAt])
+  @@map("audit_log")
+}
+
+// ── Clinical EDC: Study Protocol Models (P1.1) ──────────────────────────────
+
+/// One-to-one with Project(kind=CLINICAL). Anchor for all protocol hierarchy.
+model Study {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  projectId  String   @unique @map("project_id")
+  name       String   @default("Protocol")
+  protocolId String?  @map("protocol_id")
+
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  arms                Arm[]
+  instruments         Instrument[]
+  subjects            Subject[]
+  dags                DataAccessGroup[]
+  clinicalAccessRules ClinicalAccessRule[]
+
+  @@map("study")
+}
+
+/// Clinical Project Onboarding state captured by the post-conversion wizard.
+/// One row per Project (kind=CLINICAL). `completedAt` flips the layout-level redirect off.
+model ClinicalProjectOnboarding {
+  id          String                      @id @default(cuid())
+  createdAt   DateTime                    @default(now()) @map("created_at")
+  updatedAt   DateTime                    @updatedAt @map("updated_at")
+  projectId   String                      @unique @map("project_id")
+  purpose     ClinicalProjectPurpose?
+  startMethod ClinicalProjectStartMethod? @map("start_method")
+  templateKey String?                     @map("template_key")
+  notes       String?                     @db.Text
+  createdById String?                     @map("created_by_id")
+  completedAt DateTime?                   @map("completed_at")
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("ClinicalProjectOnboardingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@map("clinical_project_onboarding")
+}
+
+enum ClinicalProjectPurpose {
+  practice
+  operational_support
+  research
+  quality_improvement
+  other
+}
+
+enum ClinicalProjectStartMethod {
+  empty
+  template
+  import_later
+}
+
+/// Study arm (treatment group). Ordered within study by `position`.
+model Arm {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  studyId   String   @map("study_id")
+  name      String
+  position  Int
+
+  study       Study        @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  events      Event[]
+  enrollments Enrollment[]
+
+  @@unique([studyId, name])
+  @@index([studyId])
+  @@index([studyId, position])
+  @@map("arm")
+}
+
+/// Visit/event within an arm. Ordered by `position`; dayOffset/windowDays define the visit window.
+model Event {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  armId      String   @map("arm_id")
+  name       String
+  dayOffset  Int?     @map("day_offset")
+  windowDays Int?     @map("window_days")
+  position   Int
+
+  arm                 Arm                  @relation(fields: [armId], references: [id], onDelete: Cascade)
+  instruments         EventInstrument[]
+  records             Record[]
+  clinicalAccessRules ClinicalAccessRule[]
+
+  @@unique([armId, name])
+  @@index([armId])
+  @@index([armId, position])
+  @@map("event")
+}
+
+enum InstrumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum InstrumentFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SINGLE_SELECT
+  MULTI_SELECT
+}
+
+/// Immutable clinical snapshot derived from a mutable Survey authoring source.
+model Instrument {
+  id               String           @id @default(cuid())
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  studyId          String           @map("study_id")
+  surveyId         String?          @map("survey_id")
+  version          Int
+  status           InstrumentStatus @default(DRAFT)
+  publishedAt      DateTime?        @map("published_at")
+  publishedById    String?          @map("published_by_id")
+  name             String
+  displayName      String           @map("display_name")
+  sourceSurveyHash String?          @map("source_survey_hash")
+  fieldHash        String?          @map("field_hash")
+
+  study               Study                @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  survey              Survey?              @relation(fields: [surveyId], references: [id], onDelete: SetNull)
+  publishedBy         User?                @relation("publishedInstrumentUser", fields: [publishedById], references: [id], onDelete: SetNull)
+  fields              InstrumentField[]
+  eventBindings       EventInstrument[]
+  records             Record[]
+  clinicalAccessRules ClinicalAccessRule[]
+
+  @@unique([studyId, surveyId, version])
+  @@index([studyId, status])
+  @@index([surveyId, status])
+  @@map("instrument")
+}
+
+/// Flattened publish-time field snapshot used by clinical record entry.
+model InstrumentField {
+  id             String              @id @default(cuid())
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  instrumentId   String              @map("instrument_id")
+  key            String
+  label          String
+  type           InstrumentFieldType
+  validationCode String?             @map("validation_code")
+  required       Boolean             @default(false)
+  position       Int
+  choicesJson    Json?               @map("choices_json")
+  branchingJson  Json?               @map("branching_json")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, key])
+  @@index([instrumentId, position])
+  @@map("instrument_field")
+}
+
+/// Junction: published clinical instrument version bound to an event.
+model EventInstrument {
+  eventId      String  @map("event_id")
+  instrumentId String  @map("instrument_id")
+  required     Boolean @default(true)
+  repeating    Boolean @default(false)
+
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+
+  @@id([eventId, instrumentId])
+  @@index([instrumentId])
+  @@map("event_instrument")
+}
+
+enum EnrollmentStatus {
+  SCREENED
+  ENROLLED
+  ACTIVE
+  COMPLETED
+  WITHDRAWN
+  SCREEN_FAIL
+  LOST
+}
+
+/// Clinical study subject, optionally linked to an environment-scoped Contact.
+model Subject {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  studyId    String   @map("study_id")
+  externalId String   @map("external_id")
+  contactId  String?  @map("contact_id")
+
+  study       Study        @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  enrollments Enrollment[]
+  records     Record[]
+
+  @@unique([studyId, externalId])
+  @@index([studyId, createdAt])
+  @@index([contactId])
+  @@map("subject")
+}
+
+/// Enrollment lifecycle row for a subject's arm assignment.
+model Enrollment {
+  id               String           @id @default(cuid())
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  subjectId        String           @map("subject_id")
+  armId            String           @map("arm_id")
+  dagId            String?          @map("dag_id")
+  status           EnrollmentStatus
+  enrolledAt       DateTime?        @map("enrolled_at")
+  completedAt      DateTime?        @map("completed_at")
+  withdrawalReason String?          @map("withdrawal_reason")
+
+  subject Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  arm     Arm               @relation(fields: [armId], references: [id], onDelete: Restrict)
+  dag     DataAccessGroup?  @relation(fields: [dagId], references: [id], onDelete: SetNull)
+  events  EnrollmentEvent[]
+
+  @@index([subjectId, createdAt])
+  @@index([armId, status])
+  @@index([dagId])
+  @@map("enrollment")
+}
+
+/// Append-only history of enrollment lifecycle changes for auditability.
+model EnrollmentEvent {
+  id           String            @id @default(cuid())
+  enrollmentId String            @map("enrollment_id")
+  fromStatus   EnrollmentStatus? @map("from_status")
+  toStatus     EnrollmentStatus  @map("to_status")
+  byUserId     String?           @map("by_user_id")
+  occurredAt   DateTime          @default(now()) @map("occurred_at")
+  reason       String?
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId, occurredAt])
+  @@index([toStatus, occurredAt])
+  @@map("enrollment_event")
+}
+
+// ── Clinical EDC: Record / RecordValue / ValueRevision (P1.4) ───────────────
+
+enum RecordStatus {
+  INCOMPLETE
+  UNVERIFIED
+  COMPLETE
+  LOCKED
+}
+
+/// One data container per (subject × event × instrument × instance).
+/// instance = 1 for single instruments; increments for repeating instruments.
+/// projectId denormalized from Subject.study.projectId so RecordValue upserts
+/// can always supply the partition key without an extra join.
+model Record {
+  id            String       @id @default(cuid())
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  projectId     String       @map("project_id")
+  subjectId     String       @map("subject_id")
+  eventId       String       @map("event_id")
+  instrumentId  String       @map("instrument_id")
+  instance      Int          @default(1)
+  status        RecordStatus @default(INCOMPLETE)
+  lockedAt      DateTime?    @map("locked_at")
+  lockedById    String?      @map("locked_by_id")
+  /// Denormalised from subject's current enrollment.dagId for query speed. Re-synced on enrollment change.
+  dagId         String?      @map("dag_id")
+  /// Formbricks-format response payload { [elementId]: value }. Used to prefill and resume the native survey renderer.
+  responsesJson Json?        @default("{}") @map("responses_json")
+  responseId    String?      @unique @map("response_id")
+
+  subject    Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  lockedBy   User?      @relation("recordLockedByUser", fields: [lockedById], references: [id], onDelete: SetNull)
+  response   Response?  @relation("ClinicalRecordResponse", fields: [responseId], references: [id], onDelete: SetNull)
+
+  @@unique([subjectId, eventId, instrumentId, instance])
+  @@index([projectId])
+  @@index([projectId, dagId])
+  @@index([dagId])
+  @@index([subjectId, eventId])
+  @@index([status])
+  @@map("record")
+}
+
+/// One typed cell per (record × instrumentField). HASH-partitioned by projectId.
+/// Composite PK (id, projectId) required by Postgres partitioned-table constraints.
+/// No Prisma relations declared — integrity enforced at action layer to avoid
+/// FK complications with partitioned tables. Queried directly via prisma.recordValue.
+model RecordValue {
+  id                String    @default(cuid())
+  projectId         String    @map("project_id")
+  recordId          String    @map("record_id")
+  instrumentFieldId String    @map("instrument_field_id")
+  valueText         String?   @map("value_text")
+  valueNumber       Decimal?  @map("value_number") @db.Decimal(18, 6)
+  valueDate         DateTime? @map("value_date")
+  valueJson         Json?     @map("value_json")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  updatedById       String?   @map("updated_by_id")
+
+  @@id([id, projectId])
+  @@unique([recordId, instrumentFieldId, projectId])
+  @@index([recordId])
+  @@map("RecordValue")
+}
+
+/// Full cell-level edit history. One row per change after the initial write.
+/// Links to record + field via raw IDs (no FK into partitioned RecordValue).
+model ValueRevision {
+  id                String    @id @default(cuid())
+  recordId          String    @map("record_id")
+  instrumentFieldId String    @map("instrument_field_id")
+  previousText      String?   @map("previous_text")
+  previousNumber    Decimal?  @map("previous_number") @db.Decimal(18, 6)
+  previousDate      DateTime? @map("previous_date")
+  previousJson      Json?     @map("previous_json")
+  changedAt         DateTime  @default(now()) @map("changed_at")
+  changedById       String?   @map("changed_by_id")
+  reason            String?
+
+  @@index([recordId, instrumentFieldId, changedAt(sort: Desc)])
+  @@map("value_revision")
+}
+
+// ── Clinical EDC: Data Access Groups (P1.5) ──────────────────────────────────
+
+/// Site-level security tag. Subjects/records are scoped to a DAG via enrollment.
+/// Users with ≥1 DAG membership see only their DAGs; study-admins (no membership) see all.
+model DataAccessGroup {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  studyId   String   @map("study_id")
+  name      String
+  /// Short identifier for API / imports (uniqueGroupName equivalent).
+  code      String
+
+  study       Study        @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  members     DagMember[]
+  enrollments Enrollment[]
+
+  @@unique([studyId, name])
+  @@unique([studyId, code])
+  @@index([studyId])
+  @@map("data_access_group")
+}
+
+/// Maps a user to a DAG. Composite PK prevents duplicates.
+model DagMember {
+  dagId     String   @map("dag_id")
+  userId    String   @map("user_id")
+  addedAt   DateTime @default(now()) @map("added_at")
+  addedById String?  @map("added_by_id")
+
+  dag  DataAccessGroup @relation(fields: [dagId], references: [id], onDelete: Cascade)
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([dagId, userId])
+  @@index([userId])
+  @@index([dagId])
+  @@map("dag_member")
+}
+
+// ── Clinical EDC: Access Rules (P1.7) ────────────────────────────────────────
+
+enum ClinicalPermission {
+  NO_ACCESS
+  READ
+  READ_WRITE
+}
+
+/// Fine-grained access control rule (per-instrument / per-event) for a user in a study.
+/// If no rule exists, falls back to the user's project-level role permissions.
+/// Additive narrowing: explicit rules can restrict but not expand access beyond the role.
+model ClinicalAccessRule {
+  id           String             @id @default(cuid())
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  createdById  String?            @map("created_by_id")
+  userId       String             @map("user_id")
+  studyId      String             @map("study_id")
+  instrumentId String?            @map("instrument_id")
+  eventId      String?            @map("event_id")
+  permission   ClinicalPermission
+
+  createdBy  User?       @relation("ruleCreatedByUser", fields: [createdById], references: [id], onDelete: SetNull)
+  user       User        @relation("ruleTargetUser", fields: [userId], references: [id], onDelete: Cascade)
+  study      Study       @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  instrument Instrument? @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  event      Event?      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // NOTE: A raw SQL migration adds a CHECK constraint ensuring exactly one of:
+  // - instrumentId IS NOT NULL (and eventId IS NULL)
+  // - eventId IS NOT NULL (and instrumentId IS NULL)
+  // - Both are NOT NULL (targeting the EventInstrument intersection)
+  // This cannot be represented in Prisma schema directly.
+
+  @@unique([userId, studyId, instrumentId, eventId])
+  @@index([studyId])
+  @@index([userId, studyId])
+  @@map("clinical_access_rule")
+}
+
+model StorageFile {
+  id            String   @id @default(cuid())
+  environmentId String
+  accessType    String
+  fileName      String
+  contentType   String
+  data          Bytes
+  size          Int
+  createdAt     DateTime @default(now())
+
+  @@unique([environmentId, accessType, fileName])
+  @@index([environmentId, accessType])
+  @@map("storage_file")
+}

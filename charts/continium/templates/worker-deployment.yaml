@@ -1,0 +1,118 @@
+{{- if .Values.worker.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "continium.name" . }}-worker
+  labels:
+    {{- include "continium.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "continium.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "continium.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: worker
+    spec:
+      {{- if .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.worker.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml .Values.worker.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.affinity }}
+      affinity:
+        {{- toYaml .Values.worker.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .Values.worker.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      {{- if .Values.deployment.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.deployment.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- if .Values.rbac.serviceAccount.enabled }}
+      serviceAccountName: {{ .Values.rbac.serviceAccount.name | default (include "continium.name" .) }}
+      {{- end }}
+      {{- if .Values.worker.securityContext }}
+      securityContext:
+        {{- toYaml .Values.worker.securityContext | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds | default 30 }}
+      containers:
+        - name: worker
+          image: {{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion | default "latest" }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          {{- if .Values.worker.command }}
+          command:
+            {{- toYaml .Values.worker.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.args }}
+          args:
+            {{- toYaml .Values.worker.args | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.containerSecurityContext }}
+          securityContext:
+            {{- toYaml .Values.worker.containerSecurityContext | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.deployment.envFrom (or (and .Values.externalSecret.enabled (index .Values.externalSecret.files "app-secrets")) .Values.secret.enabled) }}
+          envFrom:
+          {{- if or .Values.secret.enabled (and .Values.externalSecret.enabled (index .Values.externalSecret.files "app-secrets")) }}
+          - secretRef:
+              name: {{ template "continium.name" . }}-app-secrets
+          {{- end }}
+          {{- range $value := .Values.deployment.envFrom }}
+          {{- if (eq .type "configmap") }}
+          - configMapRef:
+              {{- if .name }}
+              name: {{ include "continium.tplvalues.render" ( dict "value" $value.name "context" $ ) }}
+              {{- else if .nameSuffix }}
+              name: {{ template "continium.name" $ }}-{{ include "continium.tplvalues.render" ( dict "value" $value.nameSuffix "context" $ ) }}
+              {{- else }}
+              name: {{ template "continium.name" $ }}
+              {{- end }}
+          {{- end }}
+          {{- if (eq .type "secret") }}
+          - secretRef:
+              {{- if .name }}
+              name: {{ include "continium.tplvalues.render" ( dict "value" $value.name "context" $ ) }}
+              {{- else if .nameSuffix }}
+              name: {{ template "continium.name" $ }}-{{ include "continium.tplvalues.render" ( dict "value" $value.nameSuffix "context" $ ) }}
+              {{- else }}
+              name: {{ template "continium.name" $ }}
+              {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          env:
+            {{- range $key, $value := .Values.deployment.env }}
+            - name: {{ include "continium.tplvalues.render" ( dict "value" $key "context" $ ) }}
+              {{- if kindIs "string" $value }}
+              value: {{ include "continium.tplvalues.render" ( dict "value" $value "context" $ ) | quote }}
+              {{- else }}
+              {{- toYaml $value | nindent 14 }}
+              {{- end }}
+            {{- end }}
+            {{- range $key, $value := .Values.worker.env }}
+            - name: {{ include "continium.tplvalues.render" ( dict "value" $key "context" $ ) }}
+              {{- if kindIs "string" $value }}
+              value: {{ include "continium.tplvalues.render" ( dict "value" $value "context" $ ) | quote }}
+              {{- else }}
+              {{- toYaml $value | nindent 14 }}
+              {{- end }}
+            {{- end }}
+          {{- if .Values.worker.resources }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          {{- end }}
+{{- end }}

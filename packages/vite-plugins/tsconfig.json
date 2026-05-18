@@ -1,0 +1,3 @@
+{
+  "extends": "@continium/config-typescript/js-library.json"
+}

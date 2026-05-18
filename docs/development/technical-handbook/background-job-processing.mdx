@@ -1,0 +1,510 @@
+---
+title: "Background Job Processing"
+description: "How pg-boss works in Continium today, including the standalone worker process and job queue architecture."
+icon: "code"
+---
+
+This page documents the pg-boss-based background job system in Continium, the standalone worker process architecture, and the job workloads that run on it.
+
+## Current State
+
+Continium uses pg-boss v11 as a Postgres-native background job queue system with a standalone Node.js worker process.
+
+The current implementation includes:
+
+- a shared `@continium/jobs` package that owns queue creation, job contracts, scheduling, and worker runtime concerns
+- `JobRunner` class for the standalone worker process to register and execute jobs
+- `QueueClient` class singleton for web-side job enqueueing (no worker needed on the web side)
+- `defineJob` / `defineJobContract` utilities for Zod-validated job contracts
+- a standalone `apps/worker` Node.js process that consumes pg-boss queued jobs
+- Docker integration with `docker-compose.yml` for development and self-hosted deployments
+
+The first production workload is:
+
+- `survey.follow-up-response.send` — follow-up email delivery for survey responses
+
+This means follow-up delivery no longer depends on synchronous HTTP hops or in-process delays.
+
+## Why This Exists
+
+Follow-up delivery and other async workloads need decoupling from the request lifecycle to:
+
+- avoid blocking API responses on email delivery
+- enable reliable retries without losing work in-process
+- allow horizontal scaling of job throughput independent of the web app
+- provide durability through Postgres (no external Redis needed)
+
+pg-boss addresses these needs by moving background work behind a Postgres-based queue with a dedicated worker process, while keeping deployment simple for self-hosted users.
+
+## High-Level Architecture
+
+```mermaid
+graph TD
+    A["API route or server code"] --> B["QueueClient.enqueue()"]
+    B --> C["Parse job contract with Zod"]
+    B --> D["pg-boss send() to Postgres queue"]
+    D --> E["pgboss schema in Postgres"]
+    
+    F["apps/worker process"] --> G["JobRunner.start()"]
+    G --> H["Register all job definitions"]
+    H --> I["pg-boss work() polling"]
+    I --> E
+    I --> J["Job handler execution"]
+    J --> K["survey.follow-up-response.send handler"]
+    
+    L["SIGTERM/SIGINT"] --> M["Graceful shutdown"]
+    M --> N["Wait for in-flight jobs timeout"]
+```
+
+## Responsibilities By Layer
+
+### Web Layer (Enqueueing)
+
+- `apps/web/lib/jobs.ts` or similar
+  Uses `QueueClient.enqueue()` to dispatch jobs without blocking request handlers. Connection string comes from environment.
+
+### Shared Jobs Package
+
+- `packages/jobs/src/define-job.ts`
+  Exports `JobContract`, `JobEnqueueOptions`, `JobDefinition`, and utilities:
+  - `defineJobContract(name, schema)` — creates a Zod-validated job contract
+  - `defineJob(definition)` — wraps job definition
+  - `parseJobPayload(contract, payload)` — validates payload against schema
+
+- `packages/jobs/src/runner.ts`
+  `JobRunner` class (for worker process):
+  - `register(jobDefinition)` — register a job handler
+  - `start()` — start pg-boss, create worker pools
+  - `stop(gracefulTimeoutMs)` — graceful shutdown with timeout
+  - `enqueue()`, `schedule()`, `cancel()` — dispatch methods
+
+- `packages/jobs/src/queue-client.ts`
+  `QueueClient` singleton class (for web app):
+  - `enqueue(contract, payload, options)` — queue a job
+  - `schedule(contract, cronExpression, payload, options)` — schedule recurring jobs
+  - `createQueueClient(options)` — singleton factory
+  - `ensureStarted()` — lazy initialization with race condition guard
+
+- `packages/jobs/src/internal/pg-boss-options.ts`
+  `toPgBossSendOptions()` — translates `JobEnqueueOptions` to pg-boss API:
+  - `startAfter` → `startAfter`
+  - `retryLimit` → `retryLimit`
+  - `retryDelaySeconds` → `retryDelay`
+  - `retryBackoff` → `retryBackoff`
+  - `singletonKey` → `singletonKey`
+
+- `packages/jobs/src/contracts/*.ts`
+  Job contract definitions exported in `index.ts`:
+  - `surveyFollowUpResponseJobContract` — follow-up delivery job
+
+### Worker Process
+
+- `apps/worker/src/main.ts`
+  Entry point:
+  - Creates `JobRunner` with Postgres connection string
+  - Registers all jobs from `./jobs`
+  - Calls `runner.start()` to begin polling
+  - Sets up `SIGTERM`/`SIGINT` graceful shutdown
+
+- `apps/worker/src/jobs/*.ts`
+  Job handler implementations:
+  - Import job contract
+  - Define handler async function
+  - Export via `defineJob()`
+
+- `apps/worker/src/lib/env.ts`
+  Environment variables:
+  - `JOBS_DATABASE_URL` — Postgres connection string
+  - `JOBS_PG_BOSS_SCHEMA` — schema name (default: `pgboss`)
+  - `SHUTDOWN_TIMEOUT_MS` — graceful shutdown timeout (default: 30000ms)
+
+## Follow-Up Delivery Job Flow
+
+The `survey.follow-up-response.send` job handles follow-up email delivery for survey responses.
+
+### Enqueueing
+
+When a response triggers a follow-up, the request path calls:
+
+```ts
+const queueClient = createQueueClient({
+  connectionString: process.env.DATABASE_URL,
+  schema: "pgboss",
+});
+
+await queueClient.enqueue(
+  surveyFollowUpResponseJobContract,
+  { responseId: "resp_123" },
+  {
+    retryLimit: 3,
+    retryDelaySeconds: 5,
+    retryBackoff: true,
+  }
+);
+```
+
+That helper:
+
+1. Validates payload against the job contract schema
+2. Creates/reuses a `QueueClient` singleton
+3. Calls `boss.send()` to insert job into `pgboss.job` table
+4. Returns job ID or null on failure
+5. Never throws back into request handlers
+
+### Execution
+
+The standalone worker process:
+
+1. Initializes `JobRunner` with Postgres connection
+2. Registers all job definitions via `register(jobDefinition)`
+3. Starts pg-boss with `runner.start()`
+4. Begins polling the `pgboss.job` table for pending jobs
+5. For each `survey.follow-up-response.send` job:
+   - Parses payload (`{ responseId }`) against schema
+   - Calls handler: `POST /api/cron/follow-ups` with `responseId` and auth header
+   - On success (HTTP 200), job completes
+   - On error, retries per pg-boss retry config (3 attempts, 5s + exponential backoff)
+
+Retry semantics:
+
+- Non-200 responses throw and fail the job attempt, triggering pg-boss retry
+- Handler errors (network, timeout) also fail the attempt
+- After final retry exhausted, job moves to failed state in Postgres
+- Failed jobs are logged for manual investigation or future replay
+
+## P0.1 Implementation Status
+
+### Job Enqueueing
+
+Satisfied. Follow-up delivery calls:
+
+```ts
+await queueClient.enqueue(surveyFollowUpResponseJobContract, { responseId })
+```
+
+Enqueueing is:
+- Typed via Zod schema
+- Non-blocking (failures logged, never throw into request handlers)
+- Singleton-based connection pooling via `createQueueClient()`
+
+### Standalone Worker Process
+
+Satisfied. `apps/worker` process:
+
+- Connects to same Postgres as web app
+- Registers all job definitions
+- Polls pg-boss job table continuously
+- Executes handlers with proper error handling
+- Graceful shutdown on SIGTERM/SIGINT with configurable timeout
+- Structured logging of job lifecycle events
+
+### Job Contract Definition
+
+Satisfied. Job contracts are defined once and imported by both web and worker:
+
+```ts
+// packages/jobs/src/contracts/survey-follow-up-response-job.ts
+export const surveyFollowUpResponseJobContract = defineJobContract(
+  "survey.follow-up-response.send",
+  z.object({ responseId: z.string().trim().min(1) })
+);
+```
+
+Validation happens at enqueue time and again before handler execution (defense-in-depth).
+
+### Docker Integration
+
+Satisfied. `docker-compose.yml` includes:
+
+- `worker` service depending on Postgres
+- Health check querying `pgboss.version` table
+- Environment variables for connection string and schema
+- No external Redis dependency
+
+### Reliability
+
+Satisfied.
+
+Follow-up job retry config:
+- `retryLimit: 3`
+- `retryDelaySeconds: 5`
+- `retryBackoff: true` (exponential)
+
+Postgres-based job state ensures durability across crashes. Job state table survives worker restart.
+
+Structured logging includes:
+- `jobName`, `jobId`
+- `responseId`
+- `retryCount`
+- Full stack traces on failure
+
+Request handlers remain non-blocking:
+- if Postgres is unreachable, enqueue fails but request completes
+- failure is logged
+- caller can retry or handle manually
+
+### Developer Experience
+
+Satisfied.
+
+Public API for request handlers:
+```ts
+const queueClient = createQueueClient({...});
+await queueClient.enqueue(jobContract, payload, options);
+```
+
+Job handler developers define once:
+```ts
+export const followUpResponseJob = defineJob({
+  contract: surveyFollowUpResponseJobContract,
+  options: { concurrency: 5 },
+  handler: async ({ responseId }) => { ... }
+});
+```
+
+Details of pg-boss, schema names, and retry logic stay in the jobs package.
+
+## Architecture Benefits
+
+### vs. Synchronous Request Handlers
+
+Before pg-boss, follow-up delivery would need to complete inside the request handler or via synchronous chains. pg-boss enables:
+
+- **Non-blocking responses** — request completes after survey response is written, before follow-ups are sent
+- **Decoupled scaling** — worker processes can be scaled independently of web app load
+- **Durable retries** — jobs persist in Postgres, surviving crash or restart
+- **Observability** — dedicated logs and job state tables for debugging
+
+### vs. In-Process Queues (BullMQ in Next.js)
+
+A previous iteration used BullMQ inside the Next.js process. pg-boss replaces that with:
+
+- **Simpler deployment** — no Redis needed; Postgres is already required
+- **Explicit process boundary** — web app never becomes a background job executor
+- **Horizontal scaling** — multiple independent worker processes can consume from the same queue
+- **Production-grade** — pg-boss v11 is designed for this use case with proven reliability
+
+## Queue Model
+
+The pg-boss queue is designed for simplicity and extensibility:
+
+- **Schema**: `pgboss` (configurable via `JOBS_PG_BOSS_SCHEMA`)
+- **Job state storage**: `pgboss.job` table (auto-created on first `boss.start()`)
+- **Job names** (fully qualified):
+  - `survey.follow-up-response.send` — follow-up email delivery (P0.1)
+  - `audit.write` — audit log event persistence (P0.2)
+  - `audit.partition-create` — monthly partition pre-creation for audit table (P0.2)
+- **Database**: Same Postgres instance as web app (no external systems needed)
+
+Future workloads will be added as new contracts and job handlers, sharing the same queue infrastructure.
+
+## Audit Log Jobs (P0.2)
+
+### audit.write
+
+Asynchronously persists audit log events to the `audit_log` table.
+
+**Trigger:** Enqueued by the `@continium/audit` Prisma middleware whenever a write operation (create/update/delete) occurs on any model.
+
+**Payload:**
+```ts
+{
+  id: string;           // UUID of audit event
+  event: AuditEvent;    // Typed event enum (52+ events + PRISMA_OPERATION catch-all)
+  actorId?: string;     // User or system actor ID
+  actorIp?: string;     // IP address (from request context via AsyncLocalStorage)
+  userAgent?: string;   // User agent (from request context)
+  projectId?: string;   // Resource scope
+  resourceId?: string;  // Audited resource ID
+  resourceType?: string; // Model name
+  diff?: Json;          // JSON diff for updates
+  metadata?: Json;      // Additional context
+}
+```
+
+**Behavior:**
+- Enqueued asynchronously from the middleware; non-blocking request path
+- Fallback to synchronous `INSERT` if worker unavailable (env `AUDIT_SYNC_FALLBACK=true`)
+- Target partition selected by `occurredAt` (monthly RANGE partitions)
+- Idempotent: duplicate envelope IDs are safely ignored
+- No retries needed — failures logged, eventually retried by sync fallback path
+
+**Handler location:** `apps/worker/src/jobs/audit-write.job.ts`
+
+### audit.partition-create
+
+Pre-creates monthly RANGE partitions for the `audit_log` table, 3 months ahead of current date.
+
+**Trigger:** Scheduled cron job (monthly, typically `0 0 1 * *` — first day of month at midnight UTC).
+
+**Payload:**
+```ts
+{
+  dryRun?: boolean; // If true, log actions without creating partitions
+}
+```
+
+**Behavior:**
+- Queries `audit_log` table for partitions; detects gaps
+- Creates missing partitions for current month + next 3 months
+- Idempotent: safe to run multiple times per month
+- No side effects if partitions already exist
+- Logs created partition names for observability
+
+**Handler location:** `apps/worker/src/jobs/partition-create.job.ts`
+
+**Monitoring:** Check partition creation via:
+```sql
+SELECT
+  schemaname,
+  tablename,
+  pg_get_partkeydef(oid) as partition_key
+FROM pg_tables
+WHERE tablename LIKE 'audit_log_%'
+ORDER BY tablename DESC;
+```
+
+## Local Development
+
+Local development works end to end when Postgres is running. The worker process is separate from the web app.
+
+### Setup
+
+Run the full stack via Docker:
+
+```bash
+docker-compose up -d
+```
+
+Or manually start Postgres, then run:
+
+```bash
+# Terminal 1: Web app
+npm run dev:web
+
+# Terminal 2: Worker process
+npm run dev:worker
+```
+
+### Environment Variables
+
+The worker process needs:
+
+- `DATABASE_URL` — Postgres connection string (format: `postgresql://user:password@host:5432/dbname`)
+- `JOBS_DATABASE_URL` — Same as `DATABASE_URL` (used by worker)
+- `JOBS_PG_BOSS_SCHEMA` — Schema for pg-boss tables (default: `pgboss`)
+- `SHUTDOWN_TIMEOUT_MS` — Graceful shutdown timeout in milliseconds (default: `30000`)
+
+The web app uses the same connection string but focuses on enqueueing, not worker startup.
+
+### Behavior
+
+- If `DATABASE_URL` is missing, enqueueing fails but web app continues
+- If worker process is stopped, jobs accumulate in Postgres and are processed when worker restarts
+- Jobs persist across process restarts — no data loss
+- Worker health check: `SELECT 1 FROM pgboss.version LIMIT 1` (ensures worker has bootstrapped)
+
+## Operational Notes
+
+### Logging
+
+The worker logs:
+
+- Startup: `pg-boss runner started` with list of registered jobs
+- Job execution: `Job enqueued` (debug), job completion
+- Failures: handler errors with `jobName`, `jobId`, `retryCount`, full error stack
+- Shutdown: `Shutting down worker process` with signal, `pg-boss runner stopped`
+
+All structured logging goes through `@continium/logger` for consistency.
+
+### Graceful Shutdown
+
+The worker registers `SIGTERM` and `SIGINT` handlers to:
+
+1. Stop accepting new jobs
+2. Wait for in-flight jobs to complete (up to `SHUTDOWN_TIMEOUT_MS`, default 30s)
+3. Close Postgres connections
+4. Exit with code 0 (success) or 1 (timeout/error)
+
+On timeout, the process logs a warning and exits — in-flight jobs will retry when the worker restarts.
+
+This is important for Kubernetes graceful termination: K8s sends SIGTERM, waits for graceful period (usually 30s), then force-kills. Our 30s timeout aligns with that default.
+
+### Monitoring
+
+In production, watch:
+
+- Worker process restart frequency (indicates instability)
+- Postgres disk space (pg-boss tables grow with job history)
+- Job backlog: `SELECT COUNT(*) FROM pgboss.job WHERE state = 'created'`
+- Failed jobs: `SELECT * FROM pgboss.job WHERE state = 'failed' ORDER BY createdon DESC LIMIT 10`
+- Worker connection pool: `SELECT datname, usename, COUNT(*) FROM pg_stat_activity WHERE datname = 'continium' GROUP BY datname, usename`
+
+## P0.1 Design Decisions
+
+### Dual-Write Boundary
+
+Survey response writes happen in Postgres, and follow-up jobs are enqueued in the same Postgres instance. This is:
+
+- **No external system dependency** — Postgres is required; no Redis or Kafka
+- **At-least-once semantics** — non-transactional between response write and job enqueue, but jobs never disappear
+- **Simple for self-hosting** — one database, one process, no multi-system orchestration
+
+If stronger consistency is needed, a future phase could move to transactional writes (Postgres triggers or app-managed transactions spanning both).
+
+### Worker Process Isolation
+
+The worker runs as a separate Node.js process, not inside the web app.
+
+This design allows:
+
+- **Horizontal scaling** — multiple worker processes can consume from the same queue
+- **Separate resource pools** — CPU-heavy jobs don't starve web requests
+- **Independent lifecycle** — worker can be updated, restarted, or scaled without affecting the web app
+
+Trade-off: requires running and monitoring an additional process (but that's typical for background job systems).
+
+### Postgres Dependency
+
+pg-boss relies on Postgres for job state, polling, and locking.
+
+- **Simpler than Redis** — no additional system to operate
+- **Durability built-in** — jobs survive crash or restart
+- **Scaling limits** — for very high throughput (100k+ jobs/sec), dedicated queue systems (Kafka, RabbitMQ) are better
+
+At current scope (follow-up delivery for survey responses), Postgres is more than sufficient.
+
+### No Job Replay or Dashboard (P0.1)
+
+The current implementation provides:
+
+- Structured logging of all job lifecycle events
+- Query access to `pgboss.job` table for inspection
+
+Not included (future work):
+
+- Web UI dashboard for job inspection
+- Automatic job replay tools
+- Latency metrics or SLO tracking
+
+Operators can query Postgres directly for failed jobs and coordinate replay if needed.
+
+## Recommended Next Steps
+
+With pg-boss and the follow-up delivery job in place, useful next phases are:
+
+1. **Migrate more workloads** — export generation, notification delivery, webhook retries (all similar to follow-ups)
+2. **Add observability** — metrics on job latency, failure rate, retry counts; expose via Prometheus or similar
+3. **Job idempotency** — define and enforce rules for side effects that must be idempotent (e.g., `singletonKey` for deduplication)
+4. **Scaling investigation** — benchmark job throughput and latency; decide if dedicated queue system (Kafka, RabbitMQ) is needed later
+
+## Practical Conclusion
+
+Continium now has:
+
+- a production-grade pg-boss job system with Postgres durability
+- a standalone worker process for background job execution
+- a real production workload (`survey.follow-up-response.send`) processing follow-ups
+- clean API separation: web app enqueues via `QueueClient`, worker executes via `JobRunner`
+
+P0.1 is complete for job infrastructure and follow-up delivery.

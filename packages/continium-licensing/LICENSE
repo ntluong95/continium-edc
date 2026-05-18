@@ -1,0 +1,8 @@
+This package, @continium/licensing, is part of the Continium project and is
+licensed under the GNU Affero General Public License v3.0 (AGPLv3).
+
+See the root LICENSE file of this repository for the full AGPLv3 text.
+
+This package is original Continium code. It does not import from, copy, or
+adapt Formbricks Enterprise Edition modules (apps/web/modules/ee/). It is
+safe to use, modify, and self-host under the AGPLv3 terms.

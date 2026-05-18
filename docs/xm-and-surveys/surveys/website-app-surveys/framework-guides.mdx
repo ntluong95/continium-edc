@@ -1,0 +1,560 @@
+---
+title: "Framework Guides"
+description: "Easily add the Continium App Survey SDK to your app with guides for different frameworks."
+icon: "book"
+---
+
+Integrate the **Continium App Survey SDK** into your app using multiple options. Explore the available choices below. If you need something else, open a [**GitHub Discussion**](https://github.com/continium/continium/discussions), and we’ll be happy to help!
+
+<Info>
+  **Important for Self-Hosted Setups:**
+
+**Multi-Domain Setup:** If you are using the multi-domain setup, the `appUrl` parameter in all SDK configurations should point to your **public domain** (PUBLIC_URL environment variable). This is the domain where surveys and public-facing content are served, which may be different from your admin interface domain (WEBAPP_URL).
+
+**Single Domain Setup:** If you are using the single domain setup, the `appUrl` parameter in all SDK configurations should point to your **admin domain** (WEBAPP_URL environment variable).
+
+  </Info>
+
+<CardGroup cols={2}>
+  <Card title="HTML" icon="html5" color="orange" href="#html">
+   All you need to do is add three lines of code to your HTML script, and that's it!
+  </Card>
+
+<Card title="React.js" icon="react" color="lightblue" href="#react-js">
+  Load our JavaScript library with your environment ID, and you're ready to
+  go!
+</Card>
+
+<Card title="Next.js" icon="react" href="#next-js">
+  Natively add us to your Next.js project, with support for both App and Pages project
+  structure.
+</Card>
+
+<Card title="Vue.js" icon="vuejs" href="#vue-js">
+  Learn how to use Continium' Vue.js SDK to integrate your surveys into Vue.js applications.
+</Card>
+
+<Card title="React Native" icon="react" color="lightblue" href="#react-native">
+  Easily integrate our SDK with your React Native app for seamless survey
+  support.
+</Card>
+
+<Card title="Swift" icon="swift" color="orange" href="#swift">
+  Use our iOS SDK to quickly integrate surveys into your iOS
+  applications.
+</Card>
+
+<Card title="Android" icon="android" color="green" href="#android">
+  Integrate surveys into your Android applications using our native Kotlin
+  SDK.
+</Card>
+
+</CardGroup>
+
+## Prerequisites
+
+Before getting started, make sure you have:
+
+- A running web application with user authentication in your chosen framework.
+
+- A Continium account with your **environment ID** and **API host**, available in the **Setup Checklist** under **Settings**.
+
+## HTML
+
+All you need to do is copy a `<script>` tag to your HTML head:
+
+```javascript
+<!-- START Continium Surveys -->
+<script type="text/javascript">
+!function(){
+    var appUrl = "https://app.continium.com"; // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+    var environmentId = "<your-environment-id>";
+var t=document.createElement("script");t.type="text/javascript",t.async=!0,t.src=appUrl+"/js/continium.umd.cjs";var e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(t,e),setTimeout(function(){window.continium.setup({environmentId: environmentId, appUrl: appUrl})},500)}();
+</script>
+<!-- END Continium Surveys -->
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+Now, visit the [Validate Your Setup](#validate-your-setup) section to verify your setup!
+
+## React.js
+
+Install the Continium SDK using one of the following package managers: `npm`, `pnpm`, or `yarn`. &#x20;
+Note that **`zod`** is required as a peer dependency and must also be installed in your project.
+
+```javascript npm
+npm install @continium/js zod
+```
+
+```bash pnpm
+pnpm add @continium/js zod
+```
+
+```bash yarn
+yarn add @continium/js zod
+```
+
+Update your `App.js/ts` file to initialize Continium.
+
+```javascript src/App.js
+// other imports
+import continium from "@continium/js";
+
+if (typeof window !== "undefined") {
+  continium.setup({
+    environmentId: "<environment-id>",
+    appUrl: "<app-url>", // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+  });
+}
+
+function App() {
+  // your own app
+}
+
+export default App;
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+Now, visit the [Validate Your Setup](#validate-your-setup) section to verify your setup!
+
+## Next.js
+
+Next.js projects use either the **App Directory** or the **Pages Directory**. Since the Continium SDK runs on the client side, follow these steps based on your setup:
+
+- **App Directory**: Create a new component in `app/continium.tsx` and call it in `app/layout.tsx`.
+
+- **Pages Directory**: Initialize Continium directly in `_app.tsx`.
+
+Code snippets for the integration for both conventions are provided to further assist you.
+
+```bash npm
+npm install @continium/js zod
+```
+
+```bash pnpm
+pnpm add @continium/js zod
+```
+
+```bash yarn
+yarn add @continium/js zod
+```
+
+### App directory
+
+```typescript app/continium.tsx
+"use client";
+
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import continium from "@continium/js";
+
+export default function ContiniumProvider() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    continium.setup({
+      environmentId: "<environment-id>",
+      appUrl: "<app-url>", // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+    });
+  }, []);
+
+  useEffect(() => {
+    continium?.registerRouteChange();
+  }, [pathname, searchParams]);
+
+  return null;
+}
+```
+
+```typescript app/layout.tsx
+// other imports
+import ContiniumProvider from "./continium";
+import { Suspense } from "react";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <Suspense>
+        <ContiniumProvider />
+      </Suspense>
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+### Pages directory
+
+```javascript src/pages/_app.tsx
+// other import
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import continium from "@continium/js";
+
+if (typeof window !== "undefined") {
+  continium.setup({
+    environmentId: "<environment-id>",
+    appUrl: "<app-url>", // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+  });
+}
+
+export default function App({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Connect next.js router to Continium
+    const handleRouteChange = continium?.registerRouteChange;
+    router.events.on("routeChangeComplete", handleRouteChange);
+
+    return () => {
+      router.events.off("routeChangeComplete", handleRouteChange);
+    };
+  }, []);
+  return <Component {...pageProps} />;
+}
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+First, initialize the Continium SDK to run only on the client side. To track page changes, register the route change event with the Next.js router.
+
+Next, go to the [**Validate Your Setup**](#validate-your-setup) section to verify your setup!
+
+## Vue.js
+
+Integrating the Continium SDK with Vue.js is easy. We'll ensure the SDK is only loaded and used on the client side, as it's not meant for server-side use.
+
+```bash npm
+npm install @continium/js
+```
+
+```bash pnpm
+pnpm add @continium/js
+```
+
+```bash yarn
+yarn add @continium/js
+```
+
+```javascript src/continium.js
+import continium from "@continium/js";
+
+if (typeof window !== "undefined") {
+  continium.setup({
+    environmentId: "<environment-id>",
+    appUrl: "<app-url>", // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+  });
+}
+
+export default continium;
+```
+
+```javascript src/main.js
+// other imports
+import continium from "@/continium";
+
+const app = createApp(App);
+
+app.use(router);
+
+app.mount("#app");
+
+router.afterEach((to, from) => {
+  if (typeof continium !== "undefined") {
+    continium.registerRouteChange();
+  }
+});
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+Now, visit the [Validate Your Setup](#validate-your-setup) section to verify your setup!
+
+## React Native
+
+Install the Continium React Native SDK using one of the package managers, i.e., npm, pnpm, or yarn.
+
+```bash npm
+npm install @continium/react-native
+```
+
+```bash pnpm
+pnpm add @continium/react-native
+```
+
+```bash yarn
+yarn add @continium/react-native
+```
+
+Now, update your `App.js/App.tsx` file to initialize Continium:
+
+```javascript src/App.js
+// other imports
+import Continium from "@continium/react-native";
+
+const config = {
+  environmentId: "<environment-id>",
+  appUrl: "<app-url>", // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+};
+
+export default function App() {
+  return (
+    <>
+      {/* Your app content */}
+      <Continium initConfig={config} />
+    </>
+  );
+}
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+Now, visit the [Validate Your Setup](#validate-your-setup) section to verify your setup!
+
+## Swift
+
+<Info>**Minimum iOS Version:** The Continium iOS SDK requires **iOS 16.4** or higher.</Info>
+
+Install the Continium iOS SDK using the following steps:
+
+**Swift Package Manager**
+
+1. In Xcode choose **File → Add Packages…**
+2. Enter your repo URL (e.g. `https://github.com/continium/ios.git`)
+3. Choose version rule (e.g. "Up to Next Major" starting at `1.0.0`).
+4. Import in your code:
+
+   ```swift
+   import ContiniumSDK
+   ```
+
+**CocoaPods**
+
+1. Add the following to your `Podfile`:
+
+   ```ruby
+   platform :ios, '16.4'
+   use_frameworks! :linkage => :static
+
+   target 'YourTargetName' do
+     pod 'ContiniumSDK', '1.0.0 (or the latest version)'
+   end
+   ```
+
+2. Run `pod install` in your project directory
+3. Import in your code:
+   ```swift
+   import ContiniumSDK
+   ```
+
+Now start using ContiniumSDK
+
+```swift
+import ContiniumSDK
+
+// 1. Build your config (you can also inject userId + attributes here)
+let config = ContiniumConfig.Builder(
+        appUrl: "https://your‑app.bricks.com", // use PUBLIC_URL if you are using multi-domain setup, otherwise use WEBAPP_URL
+        environmentId: "YOUR_ENV_ID"
+    )
+    .setLogLevel(.debug)
+    .build()
+
+// 2. Initialize the SDK (once per launch)
+Continium.setup(with: config)
+
+// 3. Identify the user
+Continium.setUserId("user‑123")
+
+// 4. Track events
+Continium.track("button_pressed")
+
+// 5. Set or add user attributes
+Continium.setAttribute("blue", forKey: "favoriteColor")
+Continium.setAttributes([
+    "plan": "pro",
+    "tier": "gold"
+])
+
+// 6. Change language (no userId required):
+Continium.setLanguage("de")
+
+// 7. Log out (no userId required):
+Continium.logout()
+
+// 8. Clean up SDK state (optional):
+Continium.cleanup(waitForOperations: true) {
+    print("SDK torn down")
+}
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+Now, visit the [Validate Your Setup](#validate-your-setup) section to verify your setup!
+
+## Android
+
+<Info>
+  **Minimum Android Version:** The Continium Android SDK requires **Android 10 (API level 29)** or higher.
+</Info>
+
+Install the Continium Android SDK using the following steps:
+
+### Installation
+
+Add the Maven Central repository and the Continium SDK dependency to your application's `build.gradle.kts`:
+
+```kotlin
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation("com.continium:android:1.0.0") // replace with latest version
+}
+```
+
+Enable DataBinding in your app's module build.gradle.kts:
+
+```kotlin
+android {
+  buildFeatures {
+    dataBinding = true
+  }
+}
+```
+
+### Usage
+
+```kotlin
+// 1. Initialize the SDK
+val config = ContiniumConfig.Builder(
+    "https://your-continium-server.com",
+    "YOUR_ENVIRONMENT_ID"
+)
+  .setLoggingEnabled(true)
+  .setFragmentManager(supportFragmentManager)
+  .build()
+
+// 2. Setup Continium
+Continium.setup(this, config)
+
+// 3. Identify the user
+Continium.setUserId("user‑123")
+
+// 4. Track events
+Continium.track("button_pressed")
+
+// 5. Set or add user attributes
+Continium.setAttribute("test@web.com", "email")
+Continium.setAttributes(mapOf(Pair("attr1", "val1"), Pair("attr2", "val2")))
+
+// 6. Change language (no userId required):
+Continium.setLanguage("de")
+
+// 7. Log out:
+Continium.logout()
+```
+
+### Required Customizations
+
+| Name           | Type   | Description                            |
+| -------------- | ------ | -------------------------------------- |
+| environment-id | string | Continium Environment ID.             |
+| app-url        | string | URL of the hosted Continium instance. |
+
+## Validate your setup
+
+Once you've completed the steps above, validate your setup by checking the Setup Checklist in the Settings. The widget status indicator should change from this:
+
+![first validate](https://res.cloudinary.com/dwdb9tvii/image/upload/v1738122589/image_ecaovs.jpg)
+To this:
+
+![second validate](https://res.cloudinary.com/dwdb9tvii/image/upload/v1738122750/image_ymaenn.jpg)
+
+## Debugging Continium Integration
+
+<Note>
+  The debug mode is only available in the JavaScript SDK and works exclusively in the browser. It is not
+  supported in mobile SDKs such as React Native, iOS, or Android.
+</Note>
+
+Enabling debug mode in your browser can help troubleshoot issues with Continium. Here's how to activate it and what to look for in the logs.
+
+### Activate Debug Mode
+
+To enable debug mode, add `?continiumDebug=true` to your app's URL (e.g., [`https://example.com?continiumDebug=true)`](<https://example.com?continiumDebug=true)>).&#x20;
+
+#### View Debug Logs
+
+1. Open your browser's developer tools:
+
+- **Google Chrome/Edge**: Press `F12` or right-click and select "**Inspect" > "Console**".
+
+- **Firefox**: Press `F12` or right-click and select "**Inspect Element" > "Console**".
+
+- **Safari**: Press `Option + Command + C` to open developer tools and go to the "**Console**" tab.
+
+#### Common Use Cases
+
+Debug mode is helpful for:
+
+- Verifying Continium initialization.
+
+- Identifying issues with survey triggers.
+
+- Troubleshooting unexpected behavior.
+
+#### Debug Log Messages
+
+Logs provide insights into:
+
+- API calls and responses.
+
+- Survey triggers and form interactions.
+
+- Initialization errors.
+
+If you're stuck, visit [**GitHub Discussions**](https://github.com/continium/continium/discussions) for assistance.
+
+```
+
+```

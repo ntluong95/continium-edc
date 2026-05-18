@@ -1,0 +1,76 @@
+{{- if and .Values.envoy.enabled .Values.envoy.continium.ingress.enabled }}
+{{- $explicitHost := "" -}}
+{{- if .Values.envoy.continium.ingress.host -}}
+{{- $explicitHost = tpl .Values.envoy.continium.ingress.host $ | trim -}}
+{{- end -}}
+{{- if and .Values.ingress.enabled .Values.ingress.hosts (gt (len .Values.ingress.hosts) 0) (not $explicitHost) -}}
+{{- fail "envoy.continium.ingress.host must be set explicitly when ingress.enabled and envoy.continium.ingress.enabled are both true" -}}
+{{- end -}}
+{{- $host := include "continium.envoy.ingressHost" . -}}
+{{- $proxyServiceName := include "continium.envoy.proxyServiceName" . -}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-envoy-api" (include "continium.name" .) }}
+  namespace: {{ include "continium.namespace" . }}
+  labels:
+    {{- include "continium.labels" . | nindent 4 }}
+  {{- if .Values.envoy.continium.ingress.annotations }}
+  annotations:
+    {{- include "continium.tplvalues.render" (dict "value" .Values.envoy.continium.ingress.annotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.envoy.continium.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.envoy.continium.ingress.ingressClassName }}
+  {{- end }}
+  rules:
+    - host: {{ $host }}
+      http:
+        paths:
+          {{- if .Values.envoy.continium.routes.authCallback }}
+          - path: /api/auth/callback
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $proxyServiceName }}
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.envoy.continium.routes.v1Client }}
+          - path: /api/v1/client
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $proxyServiceName }}
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.envoy.continium.routes.v2Client }}
+          - path: /api/v2/client
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $proxyServiceName }}
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.envoy.continium.routes.v1Management }}
+          - path: /api/v1/management
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $proxyServiceName }}
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.envoy.continium.routes.storage }}
+          - path: /storage
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $proxyServiceName }}
+                port:
+                  number: 80
+          {{- end }}
+{{- end }}

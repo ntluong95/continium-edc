@@ -1,0 +1,446 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "tasks": {
+    "@continium/ai#build": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/ai#lint": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/ai#test": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/ai#test:coverage": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/cache#build": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/cache#go": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/cache#lint": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/cache#test": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/cache#test:coverage": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/database#build": {
+      "dependsOn": ["^build", "@continium/audit#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/database#lint": {
+      "dependsOn": ["@continium/logger#build", "@continium/database#build"]
+    },
+    "@continium/email#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@continium/i18n-utils#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/i18n-utils#lint": {
+      "dependsOn": ["^lint"]
+    },
+    "@continium/i18n-utils#test": {
+      "dependsOn": ["@continium/i18n-utils#build"]
+    },
+    "@continium/audit#build": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/audit#lint": {
+      "dependsOn": ["@continium/audit#build"]
+    },
+    "@continium/audit#test": {
+      "dependsOn": ["@continium/audit#build"]
+    },
+    "@continium/jobs#build": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/jobs#lint": {
+      "dependsOn": ["@continium/jobs#build"]
+    },
+    "@continium/jobs#test": {
+      "dependsOn": ["@continium/jobs#build"]
+    },
+    "@continium/license-generator#build": {
+      "dependsOn": [],
+      "outputs": []
+    },
+    "@continium/license-generator#dev": {
+      "cache": false,
+      "dependsOn": ["@continium/license-generator#build"],
+      "outputs": []
+    },
+    "@continium/license-generator#test": {
+      "dependsOn": ["@continium/license-generator#build"],
+      "outputs": []
+    },
+    "@continium/license-server#build": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": [".next/**"]
+    },
+    "@continium/license-server#dev": {
+      "cache": false,
+      "dependsOn": ["@continium/logger#build"],
+      "persistent": true
+    },
+    "@continium/license-server#go": {
+      "cache": false,
+      "dependsOn": ["@continium/logger#build"],
+      "persistent": true
+    },
+    "@continium/license-server#test": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": []
+    },
+    "@continium/js-core#build": {
+      "dependsOn": ["^build", "@continium/database#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/js-core#go": {
+      "cache": false,
+      "dependsOn": ["@continium/database#db:setup"],
+      "persistent": true
+    },
+    "@continium/js-core#lint": {
+      "dependsOn": ["@continium/database#build"]
+    },
+    "@continium/logger#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/storage#build": {
+      "dependsOn": ["@continium/logger#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/storage#go": {
+      "cache": false,
+      "dependsOn": ["@continium/storage#build"],
+      "persistent": true
+    },
+    "@continium/storage#lint": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/storage#test": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/storage#test:coverage": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "@continium/survey-ui#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/survey-ui#build:dev": {
+      "dependsOn": ["^build:dev"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/survey-ui#go": {
+      "cache": false,
+      "dependsOn": ["@continium/survey-ui#build"],
+      "persistent": true
+    },
+    "@continium/surveys#build": {
+      "dependsOn": ["^build", "@continium/survey-ui#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/surveys#build:dev": {
+      "dependsOn": ["^build:dev", "@continium/i18n-utils#build", "@continium/survey-ui#build:dev"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/surveys#go": {
+      "cache": false,
+      "dependsOn": ["@continium/survey-ui#build", "@continium/surveys#build"],
+      "persistent": true
+    },
+    "@continium/surveys#test": {
+      "dependsOn": ["@continium/survey-ui#build"]
+    },
+    "@continium/surveys#test:coverage": {
+      "dependsOn": ["@continium/survey-ui#build"]
+    },
+    "@continium/web#dev": {
+      "cache": false,
+      "dependsOn": [
+        "@continium/ai#build",
+        "@continium/cache#build",
+        "@continium/database#build",
+        "@continium/jobs#build",
+        "@continium/logger#build",
+        "@continium/storage#build"
+      ],
+      "persistent": true
+    },
+    "@continium/web#go": {
+      "cache": false,
+      "dependsOn": [
+        "@continium/ai#build",
+        "@continium/cache#build",
+        "@continium/database#build",
+        "@continium/database#db:setup",
+        "@continium/jobs#build",
+        "@continium/logger#build",
+        "@continium/storage#build"
+      ],
+      "persistent": true
+    },
+    "@continium/web#test": {
+      "dependsOn": [
+        "@continium/ai#build",
+        "@continium/logger#build",
+        "@continium/database#build",
+        "@continium/jobs#build",
+        "@continium/storage#build",
+        "@continium/cache#build",
+        "@continium/surveys#build"
+      ]
+    },
+    "@continium/web#test:coverage": {
+      "dependsOn": [
+        "@continium/ai#build",
+        "@continium/logger#build",
+        "@continium/database#build",
+        "@continium/jobs#build",
+        "@continium/storage#build",
+        "@continium/cache#build",
+        "@continium/surveys#build"
+      ]
+    },
+    "@continium/worker#build": {
+      "dependsOn": ["@continium/audit#build", "@continium/jobs#build", "@continium/database#build", "@continium/logger#build"],
+      "outputs": ["dist/**"]
+    },
+    "@continium/worker#dev": {
+      "cache": false,
+      "dependsOn": ["@continium/audit#build", "@continium/jobs#build", "@continium/database#build", "@continium/logger#build"],
+      "persistent": true
+    },
+    "@continium/worker#go": {
+      "cache": false,
+      "dependsOn": [
+        "@continium/audit#build",
+        "@continium/jobs#build",
+        "@continium/database#build",
+        "@continium/database#db:setup",
+        "@continium/logger#build"
+      ],
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "env": [
+        "AUDIT_LOG_ENABLED",
+        "AUDIT_LOG_GET_USER_IP",
+        "AI_AWS_ACCESS_KEY_ID",
+        "AI_AWS_REGION",
+        "AI_AWS_SECRET_ACCESS_KEY",
+        "AI_AWS_SESSION_TOKEN",
+        "AI_AZURE_API_KEY",
+        "AI_AZURE_API_VERSION",
+        "AI_AZURE_BASE_URL",
+        "AI_AZURE_RESOURCE_NAME",
+        "AI_GCP_APPLICATION_CREDENTIALS",
+        "AI_GCP_CREDENTIALS_JSON",
+        "AI_GCP_LOCATION",
+        "AI_GCP_PROJECT",
+        "AI_MODEL",
+        "AI_PROVIDER",
+        "ASSET_PREFIX_URL",
+        "AZUREAD_CLIENT_ID",
+        "AZUREAD_CLIENT_SECRET",
+        "AZUREAD_TENANT_ID",
+        "AUTH_SSO_DEFAULT_TEAM_ID",
+        "AUTH_SKIP_INVITE_FOR_SSO",
+        "BASE_PATH",
+        "BREVO_API_KEY",
+        "BREVO_LIST_ID",
+        "CRON_SECRET",
+        "DATABASE_URL",
+        "LICENSE_DATABASE_URL",
+        "JOBS_DATABASE_URL",
+        "JOBS_FOLLOW_UP_ENDPOINT_URL",
+        "JOBS_PG_BOSS_SCHEMA",
+        "JOBS_WORKER_SHUTDOWN_TIMEOUT_MS",
+        "DEBUG",
+        "DEBUG_SHOW_RESET_LINK",
+        "E2E_TESTING",
+        "EMAIL_AUTH_DISABLED",
+        "EMAIL_VERIFICATION_DISABLED",
+        "ENCRYPTION_KEY",
+        "CONTINIUM_LICENSE_ADMIN_TOKEN",
+        "CONTINIUM_LICENSE_ADMIN_TOKEN_PREV",
+        "CONTINIUM_LICENSE_SERVER_URL",
+        "ENTERPRISE_LICENSE_KEY",
+        "ENVIRONMENT",
+        "GITHUB_ID",
+        "GITHUB_SECRET",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "HEROKU_APP_NAME",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "IMPRINT_URL",
+        "IMPRINT_ADDRESS",
+        "INVITE_DISABLED",
+        "IS_CONTINIUM_CLOUD",
+        "CHATWOOT_WEBSITE_TOKEN",
+        "CHATWOOT_BASE_URL",
+        "POSTHOG_KEY",
+        "LOG_LEVEL",
+        "MAIL_FROM",
+        "MAIL_FROM_NAME",
+        "NEXT_PUBLIC_LAYER_API_KEY",
+        "NEXT_PUBLIC_DOCSEARCH_APP_ID",
+        "NEXT_PUBLIC_DOCSEARCH_API_KEY",
+        "NEXT_PUBLIC_DOCSEARCH_INDEX_NAME",
+        "NEXT_PUBLIC_CONTINIUM_PMF_FORM_ID",
+        "NEXT_PUBLIC_CONTINIUM_URL",
+        "NEXT_PUBLIC_CONTINIUM_COM_API_HOST",
+        "NEXT_PUBLIC_CONTINIUM_COM_ENVIRONMENT_ID",
+        "NEXT_PUBLIC_CONTINIUM_COM_DOCS_FEEDBACK_SURVEY_ID",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        "OTEL_EXPORTER_OTLP_PROTOCOL",
+        "OTEL_RESOURCE_ATTRIBUTES",
+        "OTEL_SERVICE_NAME",
+        "OTEL_TRACES_SAMPLER",
+        "OTEL_TRACES_SAMPLER_ARG",
+        "NEXT_RUNTIME",
+        "NEXTAUTH_SECRET",
+        "NEXTAUTH_URL",
+        "NODE_ENV",
+        "npm_package_version",
+        "OIDC_CLIENT_ID",
+        "OIDC_CLIENT_SECRET",
+        "OIDC_DISPLAY_NAME",
+        "OIDC_ISSUER",
+        "OIDC_SIGNING_ALGORITHM",
+        "PASSWORD_RESET_DISABLED",
+        "PASSWORD_RESET_TOKEN_LIFETIME_MINUTES",
+        "PLAYWRIGHT_CI",
+        "PRIVACY_URL",
+        "RATE_LIMITING_DISABLED",
+        "REDIS_URL",
+        "S3_ACCESS_KEY",
+        "S3_BUCKET_NAME",
+        "S3_ENDPOINT_URL",
+        "S3_FORCE_PATH_STYLE",
+        "S3_REGION",
+        "S3_SECRET_KEY",
+        "SAML_DATABASE_URL",
+        "SESSION_MAX_AGE",
+        "SENTRY_AUTH_TOKEN",
+        "SENTRY_DSN",
+        "SENTRY_ENVIRONMENT",
+        "SMTP_HOST",
+        "SMTP_PASSWORD",
+        "SMTP_PORT",
+        "SMTP_SECURE_ENABLED",
+        "SMTP_USER",
+        "SMTP_REJECT_UNAUTHORIZED_TLS",
+        "SMTP_AUTHENTICATED",
+        "STRAPI_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_PUBLISHABLE_KEY",
+        "SURVEYS_PACKAGE_MODE",
+        "SURVEYS_PACKAGE_BUILD",
+        "PUBLIC_URL",
+        "TURNSTILE_SECRET_KEY",
+        "TURNSTILE_SITE_KEY",
+        "RECAPTCHA_SITE_KEY",
+        "RECAPTCHA_SECRET_KEY",
+        "TELEMETRY_DISABLED",
+        "TERMS_URL",
+        "VERCEL",
+        "VERCEL_URL",
+        "VERSION",
+        "WEBAPP_URL",
+        "UNSPLASH_ACCESS_KEY",
+        "PROMETHEUS_ENABLED",
+        "PROMETHEUS_EXPORTER_PORT",
+        "USER_MANAGEMENT_MINIMUM_ROLE"
+      ],
+      "outputs": ["dist/**", ".next/**"]
+    },
+    "build:dev": {
+      "dependsOn": ["^build:dev"],
+      "outputs": ["dist/**", ".next/**"]
+    },
+    "clean": {
+      "cache": false,
+      "outputs": []
+    },
+    "db:down": {
+      "cache": false,
+      "outputs": []
+    },
+    "db:migrate:deploy": {
+      "cache": false,
+      "outputs": []
+    },
+    "db:migrate:dev": {
+      "cache": false,
+      "outputs": []
+    },
+    "db:push": {
+      "outputs": []
+    },
+    "db:seed": {
+      "env": ["ALLOW_SEED"],
+      "outputs": []
+    },
+    "db:setup": {
+      "cache": false,
+      "dependsOn": ["@continium/logger#build", "@continium/database#build"],
+      "outputs": []
+    },
+    "db:start": {
+      "cache": false
+    },
+    "db:up": {
+      "cache": false,
+      "outputs": []
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "generate": {
+      "dependsOn": ["^generate"]
+    },
+    "go": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": []
+    },
+    "start": {
+      "outputs": []
+    },
+    "storybook": {
+      "cache": false,
+      "persistent": true
+    },
+    "storybook#storybook": {
+      "dependsOn": ["@continium/logger#build"]
+    },
+    "test": {
+      "outputs": []
+    },
+    "test:coverage": {
+      "outputs": []
+    }
+  },
+  "ui": "stream"
+}

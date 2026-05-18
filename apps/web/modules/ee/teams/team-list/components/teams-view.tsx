@@ -1,0 +1,75 @@
+import { ResourceNotFoundError } from "@continium/types/errors";
+import { TOrganizationRole } from "@continium/types/memberships";
+import { SettingsCard } from "@/app/(app)/environments/[environmentId]/settings/components/SettingsCard";
+import { IS_CONTINIUM_CLOUD } from "@/lib/constants";
+import { getTranslate } from "@/lingodotdev/server";
+import { TeamsTable } from "@/modules/ee/teams/team-list/components/teams-table";
+import { getProjectsByOrganizationId } from "@/modules/ee/teams/team-list/lib/project";
+import { getTeams } from "@/modules/ee/teams/team-list/lib/team";
+import { getMembersByOrganizationId } from "@/modules/organization/settings/teams/lib/membership";
+import { ModalButton, UpgradePrompt } from "@/modules/ui/components/upgrade-prompt";
+
+interface TeamsViewProps {
+  organizationId: string;
+  membershipRole?: TOrganizationRole;
+  currentUserId: string;
+  isAccessControlAllowed: boolean;
+  environmentId: string;
+}
+
+export const TeamsView = async ({
+  organizationId,
+  membershipRole,
+  currentUserId,
+  isAccessControlAllowed,
+  environmentId,
+}: TeamsViewProps) => {
+  const t = await getTranslate();
+
+  const [teams, orgMembers, orgProjects] = await Promise.all([
+    getTeams(currentUserId, organizationId),
+    getMembersByOrganizationId(organizationId),
+    getProjectsByOrganizationId(organizationId),
+  ]);
+
+  if (!teams) {
+    throw new ResourceNotFoundError(t("common.teams"), null);
+  }
+
+  const buttons: [ModalButton, ModalButton] = [
+    {
+      text: IS_CONTINIUM_CLOUD ? t("common.upgrade_plan") : t("common.request_trial_license"),
+      href: IS_CONTINIUM_CLOUD
+        ? `/environments/${environmentId}/settings/billing`
+        : "https://continium.com/docs/self-hosting/license#30-day-trial-license-request",
+    },
+    {
+      text: t("common.learn_more"),
+      href: "https://continium.com/docs/self-hosting/license",
+    },
+  ];
+
+  return (
+    <SettingsCard
+      title={t("environments.settings.teams.teams")}
+      description={t("environments.settings.teams.teams_description")}>
+      {isAccessControlAllowed ? (
+        <TeamsTable
+          teams={teams}
+          membershipRole={membershipRole}
+          organizationId={organizationId}
+          orgMembers={orgMembers}
+          orgProjects={orgProjects}
+          currentUserId={currentUserId}
+        />
+      ) : (
+        <UpgradePrompt
+          title={t("environments.settings.teams.unlock_teams_title")}
+          description={t("environments.settings.teams.unlock_teams_description")}
+          buttons={buttons}
+          feature="teams"
+        />
+      )}
+    </SettingsCard>
+  );
+};

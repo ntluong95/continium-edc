@@ -1,0 +1,51 @@
+{
+  "name": "@continium/storage",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "homepage": "https://continium.com",
+  "description": "Storage Controller for Continium",
+  "main": "./dist/index.js",
+  "types": "./dist/src/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/continium/continium"
+  },
+  "keywords": [
+    "Continium",
+    "storage",
+    "storage controller"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "types": "./dist/src/index.d.ts",
+    "import": "./dist/index.js",
+    "require": "./dist/index.cjs"
+  },
+  "scripts": {
+    "clean": "rimraf .turbo node_modules coverage dist",
+    "lint": "eslint . --ext .ts,.js",
+    "lint:fix": "eslint . --ext .ts,.js --fix",
+    "lint:report": "eslint . --format json --output-file ../../lint-results/app-store.json",
+    "build": "vite build && tsc --project tsconfig.build.json",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "go": "vite build --watch --mode dev"
+  },
+  "author": "Continium <hola@continium.com>",
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1007.0",
+    "@aws-sdk/s3-presigned-post": "3.1007.0",
+    "@aws-sdk/s3-request-presigner": "3.1007.0",
+    "@continium/logger": "workspace:*"
+  },
+  "devDependencies": {
+    "@continium/config-typescript": "workspace:*",
+    "@continium/eslint-config": "workspace:*",
+    "@vitest/coverage-v8": "4.1.6",
+    "vite": "7.3.3",
+    "vitest": "4.1.6"
+  }
+}

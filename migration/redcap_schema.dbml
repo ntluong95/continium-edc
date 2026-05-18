@@ -1,0 +1,3828 @@
+Project REDCap {
+  database_type: "MySQL"
+}
+
+Table redcap_actions {
+  action_id int(10)
+  project_id int(10)
+  survey_id int(10)
+  action_trigger enum('MANUAL','ENDOFSURVEY','SURVEYQUESTION')
+  action_response enum('NONE','EMAIL_PRIMARY','EMAIL_SECONDARY','EMAIL_TERTIARY','STOPSURVEY','PROMPT')
+  custom_text text
+  recipient_id int(10)
+  Indexes {
+    (action_id) [pk]
+    (survey_id,recipient_id) [unique, name: "survey_recipient_id"]
+  }
+}
+
+Table redcap_ai_log {
+  ai_id int(11)
+  ts datetime
+  service varchar(100)
+  type varchar(100)
+  project_id int(11)
+  user_id int(11)
+  num_chars_sent int(11)
+  num_words_sent int(11)
+  num_chars_received int(11)
+  num_words_received int(11)
+  Indexes {
+    (ai_id) [pk]
+  }
+}
+
+Table redcap_alerts {
+  alert_id int(10)
+  project_id int(10)
+  alert_title varchar(100)
+  alert_type enum('EMAIL','SMS','VOICE_CALL','SENDGRID_TEMPLATE')
+  alert_stop_type enum('RECORD','RECORD_EVENT','RECORD_EVENT_INSTRUMENT','RECORD_INSTRUMENT','RECORD_EVENT_INSTRUMENT_INSTANCE')
+  email_deleted tinyint(1)
+  alert_expiration datetime
+  form_name varchar(255)
+  form_name_event int(10)
+  alert_condition text
+  ensure_logic_still_true tinyint(1)
+  do_not_clear_recurrences tinyint(1)
+  prevent_piping_identifiers tinyint(1)
+  email_incomplete tinyint(1)
+  email_from varchar(191)
+  email_from_display varchar(150)
+  email_to text
+  phone_number_to text
+  email_cc text
+  email_bcc text
+  email_subject varchar(255)
+  alert_message text
+  email_failed varchar(255)
+  email_attachment_variable text
+  email_attachment1 int(10)
+  email_attachment2 int(10)
+  email_attachment3 int(10)
+  email_attachment4 int(10)
+  email_attachment5 int(10)
+  email_repetitive tinyint(1)
+  email_repetitive_change tinyint(1)
+  email_repetitive_change_calcs tinyint(1)
+  cron_send_email_on enum('now','date','time_lag','next_occurrence')
+  cron_send_email_on_date datetime
+  cron_send_email_on_time_lag_days int(4)
+  cron_send_email_on_time_lag_hours int(3)
+  cron_send_email_on_time_lag_minutes int(3)
+  cron_send_email_on_field varchar(255)
+  cron_send_email_on_field_after enum('before','after')
+  cron_send_email_on_next_day_type enum('DAY','WEEKDAY','WEEKENDDAY','SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY')
+  cron_send_email_on_next_time time
+  cron_repeat_for float
+  cron_repeat_for_units enum('DAYS','HOURS','MINUTES')
+  cron_repeat_for_max smallint(4)
+  email_timestamp_sent datetime
+  email_sent tinyint(1)
+  alert_order int(10)
+  sendgrid_template_id text
+  sendgrid_template_data text
+  sendgrid_mail_send_configuration text
+  Indexes {
+    (alert_id) [pk]
+  }
+}
+
+Table redcap_alerts_recurrence {
+  aq_id int(10)
+  alert_id int(10)
+  creation_date datetime
+  record varchar(100)
+  event_id int(10)
+  instrument varchar(100)
+  instance smallint(4)
+  send_option enum('now','date','time_lag','next_occurrence')
+  times_sent smallint(4)
+  last_sent datetime
+  status enum('IDLE','QUEUED','SENDING')
+  first_send_time datetime
+  next_send_time datetime
+  Indexes {
+    (aq_id) [pk]
+    (alert_id,record,event_id,instrument,instance) [unique, name: "alert_id_record_instrument_instance"]
+  }
+}
+
+Table redcap_alerts_sent {
+  alert_sent_id int(10)
+  alert_id int(10)
+  record varchar(100)
+  event_id int(10)
+  instrument varchar(100)
+  instance smallint(4)
+  last_sent datetime
+  Indexes {
+    (alert_sent_id) [pk]
+    (alert_id,record,event_id,instrument,instance) [unique, name: "alert_id_record_event_instrument_instance"]
+  }
+}
+
+Table redcap_alerts_sent_log {
+  alert_sent_log_id int(10)
+  alert_sent_id int(10)
+  alert_type enum('EMAIL','SMS','VOICE_CALL','SENDGRID_TEMPLATE')
+  time_sent datetime
+  email_from varchar(191)
+  email_to text
+  phone_number_to text
+  email_cc text
+  email_bcc text
+  subject text
+  message mediumtext
+  attachment_names text
+  Indexes {
+    (alert_sent_log_id) [pk]
+  }
+}
+
+Table redcap_auth {
+  username varchar(191)
+  password varchar(255)
+  password_salt varchar(255)
+  legacy_hash int(1)
+  temp_pwd int(1)
+  password_question int(10)
+  password_answer text
+  password_question_reminder datetime
+  password_reset_key varchar(191)
+  Indexes {
+    (username) [pk]
+    (password_reset_key) [unique, name: "password_reset_key"]
+  }
+}
+
+Table redcap_auth_history {
+  username varchar(255)
+  password varchar(255)
+  timestamp datetime
+}
+
+Table redcap_auth_questions {
+  qid int(10)
+  question text
+  Indexes {
+    (qid) [pk]
+  }
+}
+
+Table redcap_cache {
+  cache_id bigint(19)
+  project_id int(11)
+  cache_key varchar(191)
+  data longblob
+  ts datetime
+  expiration datetime
+  invalidation_strategies text
+  Indexes {
+    (cache_id) [pk]
+    (project_id,cache_key) [unique, name: "project_id_cache_key"]
+  }
+}
+
+Table redcap_cde_cache {
+  cache_id int(10)
+  tinyId varchar(50)
+  publicId varchar(50)
+  steward varchar(100)
+  question text
+  choices text
+  updated_on datetime
+  Indexes {
+    (cache_id) [pk]
+    (publicId) [unique, name: "publicId"]
+    (tinyId) [unique, name: "tinyId"]
+  }
+}
+
+Table redcap_cde_field_mapping {
+  project_id int(10)
+  field_name varchar(100)
+  tinyId varchar(50)
+  publicId varchar(50)
+  questionId varchar(50)
+  steward varchar(100)
+  web_service varchar(50)
+  org_selected varchar(100)
+  Indexes {
+    (project_id,field_name) [unique, name: "project_field"]
+  }
+}
+
+Table redcap_config {
+  field_name varchar(191)
+  value mediumtext
+  Indexes {
+    (field_name) [pk]
+  }
+}
+
+Table redcap_crons {
+  cron_id int(10)
+  cron_name varchar(100)
+  external_module_id int(11)
+  cron_description text
+  cron_enabled enum('ENABLED','DISABLED')
+  cron_frequency int(10)
+  cron_max_run_time int(10)
+  cron_instances_max int(2)
+  cron_instances_current int(2)
+  cron_last_run_start datetime
+  cron_last_run_end datetime
+  cron_times_failed int(2)
+  cron_external_url text
+  Indexes {
+    (cron_id) [pk]
+    (cron_name,external_module_id) [unique, name: "cron_name_module_id"]
+  }
+}
+
+Table redcap_crons_datediff {
+  dd_id int(10)
+  project_id int(10)
+  record varchar(100)
+  asi_updated_at datetime
+  asi_last_update_start datetime
+  asi_status enum('QUEUED','PROCESSING')
+  alert_updated_at datetime
+  alert_last_update_start datetime
+  alert_status enum('QUEUED','PROCESSING')
+  Indexes {
+    (dd_id) [pk]
+    (project_id,record) [unique, name: "project_record"]
+  }
+}
+
+Table redcap_crons_history {
+  ch_id int(10)
+  cron_id int(10)
+  cron_run_start datetime
+  cron_run_end datetime
+  cron_run_status enum('PROCESSING','COMPLETED','FAILED')
+  cron_info text
+  Indexes {
+    (ch_id) [pk]
+  }
+}
+
+Table redcap_custom_queries {
+  qid int(10)
+  title text
+  query text
+  Indexes {
+    (qid) [pk]
+  }
+}
+
+Table redcap_custom_queries_folders {
+  folder_id int(10)
+  name varchar(64)
+  position smallint(4)
+  Indexes {
+    (folder_id) [pk]
+  }
+}
+
+Table redcap_custom_queries_folders_items {
+  folder_id int(10)
+  qid int(10)
+  Indexes {
+    (folder_id,qid) [unique, name: "folder_id_qid"]
+  }
+}
+
+Table redcap_dashboard_ip_location_cache {
+  ip varchar(100)
+  latitude varchar(50)
+  longitude varchar(50)
+  city varchar(255)
+  region varchar(255)
+  country varchar(255)
+  Indexes {
+    (ip) [pk]
+  }
+}
+
+Table redcap_data {
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  value text
+  instance smallint(4)
+}
+
+Table redcap_data2 {
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  value text
+  instance smallint(4)
+}
+
+Table redcap_data3 {
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  value text
+  instance smallint(4)
+}
+
+Table redcap_data4 {
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  value text
+  instance smallint(4)
+}
+
+Table redcap_data5 {
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  value text
+  instance smallint(4)
+}
+
+Table redcap_data6 {
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  value text
+  instance smallint(4)
+}
+
+Table redcap_data_access_groups {
+  group_id int(10)
+  project_id int(10)
+  group_name varchar(255)
+  Indexes {
+    (group_id) [pk]
+  }
+}
+
+Table redcap_data_access_groups_users {
+  project_id int(10)
+  group_id int(10)
+  username varchar(191)
+  Indexes {
+    (group_id,username) [unique, name: "group_id"]
+    (username,project_id,group_id) [unique, name: "username"]
+  }
+}
+
+Table redcap_data_dictionaries {
+  dd_id int(10)
+  project_id int(10)
+  doc_id int(10)
+  ui_id int(10)
+  Indexes {
+    (dd_id) [pk]
+  }
+}
+
+Table redcap_data_import {
+  import_id int(10)
+  project_id int(10)
+  user_id int(10)
+  dag_id int(10)
+  filename varchar(191)
+  upload_time datetime
+  completed_time datetime
+  total_processing_time int(10)
+  status enum('INITIALIZING','QUEUED','PROCESSING','COMPLETED','FAILED','CANCELED','PAUSED')
+  csv_header mediumtext
+  records_provided int(10)
+  records_imported int(10)
+  total_errors int(10)
+  delimiter enum(',',';','TAB')
+  date_format enum('YMD','MDY','DMY')
+  overwrite_behavior enum('normal','overwrite')
+  force_auto_number tinyint(1)
+  change_reason text
+  Indexes {
+    (import_id) [pk]
+  }
+}
+
+Table redcap_data_import_rows {
+  row_id int(10)
+  import_id int(10)
+  record_provided varchar(100)
+  record varchar(100)
+  event_id int(10)
+  row_status enum('QUEUED','PROCESSING','COMPLETED','FAILED','CANCELED')
+  start_time datetime
+  end_time datetime
+  total_time int(10)
+  row_data longtext
+  error_count int(10)
+  errors text
+  Indexes {
+    (row_id) [pk]
+    (import_id,row_id) [unique, name: "import_row_id"]
+  }
+}
+
+Table redcap_data_quality_resolutions {
+  res_id int(10)
+  status_id int(10)
+  ts datetime
+  user_id int(10)
+  response_requested int(1)
+  response enum('DATA_MISSING','TYPOGRAPHICAL_ERROR','CONFIRMED_CORRECT','WRONG_SOURCE','OTHER')
+  comment text
+  current_query_status enum('OPEN','CLOSED','VERIFIED','DEVERIFIED')
+  upload_doc_id int(10)
+  field_comment_edited int(1)
+  Indexes {
+    (res_id) [pk]
+  }
+}
+
+Table redcap_data_quality_rules {
+  rule_id int(10)
+  project_id int(10)
+  rule_order int(3)
+  rule_name text
+  rule_logic text
+  real_time_execute int(1)
+  Indexes {
+    (rule_id) [pk]
+  }
+}
+
+Table redcap_data_quality_status {
+  status_id int(10)
+  rule_id int(10)
+  pd_rule_id int(2)
+  non_rule int(1)
+  project_id int(11)
+  record varchar(100)
+  event_id int(10)
+  field_name varchar(100)
+  repeat_instrument varchar(100)
+  instance smallint(4)
+  status int(2)
+  exclude int(1)
+  query_status enum('OPEN','CLOSED','VERIFIED','DEVERIFIED')
+  assigned_user_id int(10)
+  Indexes {
+    (status_id) [pk]
+    (non_rule,project_id,record,event_id,field_name,instance) [unique, name: "nonrule_proj_record_event_field"]
+    (pd_rule_id,record,event_id,field_name,project_id,instance) [unique, name: "pd_rule_proj_record_event_field"]
+    (rule_id,record,event_id,instance) [unique, name: "rule_record_event"]
+  }
+}
+
+Table redcap_ddp_log_view {
+  ml_id int(10)
+  time_viewed datetime
+  user_id int(10)
+  project_id int(10)
+  source_id varchar(255)
+  Indexes {
+    (ml_id) [pk]
+  }
+}
+
+Table redcap_ddp_log_view_data {
+  ml_id int(10)
+  source_field varchar(100)
+  source_timestamp datetime
+  md_id int(10)
+}
+
+Table redcap_ddp_mapping {
+  map_id int(10)
+  external_source_field_name varchar(100)
+  is_record_identifier int(1)
+  project_id int(10)
+  event_id int(10)
+  field_name varchar(100)
+  temporal_field varchar(100)
+  preselect enum('MIN','MAX','FIRST','LAST','NEAR')
+  Indexes {
+    (map_id) [pk]
+    (project_id,event_id,field_name,external_source_field_name) [unique, name: "project_field_event_source"]
+    (project_id,is_record_identifier) [unique, name: "project_identifier"]
+  }
+}
+
+Table redcap_ddp_preview_fields {
+  project_id int(10)
+  field1 varchar(100)
+  field2 varchar(100)
+  field3 varchar(100)
+  field4 varchar(100)
+  field5 varchar(100)
+  Indexes {
+    (project_id) [pk]
+  }
+}
+
+Table redcap_ddp_records {
+  mr_id int(10)
+  project_id int(10)
+  record varchar(100)
+  updated_at datetime
+  item_count int(10)
+  fetch_status enum('QUEUED','FETCHING')
+  future_date_count int(10)
+  Indexes {
+    (mr_id) [pk]
+    (project_id,record) [unique, name: "project_record"]
+  }
+}
+
+Table redcap_ddp_records_data {
+  md_id int(10)
+  map_id int(10)
+  mr_id int(10)
+  source_timestamp datetime
+  source_value text
+  source_value2 text
+  adjudicated int(1)
+  exclude int(1)
+  Indexes {
+    (md_id) [pk]
+  }
+}
+
+Table redcap_descriptive_popups {
+  popup_id int(10)
+  project_id int(10)
+  hex_link_color char(7)
+  inline_text varchar(100)
+  inline_text_popup_description text
+  active_on_surveys tinyint(1)
+  active_on_data_entry_forms tinyint(1)
+  first_occurrence_only tinyint(1)
+  list_instruments longtext
+  list_survey_pages longtext
+  Indexes {
+    (popup_id) [pk]
+  }
+}
+
+Table redcap_docs {
+  docs_id int(11)
+  project_id int(10)
+  docs_date date
+  docs_name varchar(255)
+  docs_size double
+  docs_type text
+  docs_file longblob
+  docs_comment text
+  docs_rights text
+  export_file int(1)
+  temp int(1)
+  Indexes {
+    (docs_id) [pk]
+  }
+}
+
+Table redcap_docs_attachments {
+  docs_id int(10)
+  Indexes {
+    (docs_id) [pk]
+  }
+}
+
+Table redcap_docs_folders {
+  folder_id int(10)
+  project_id int(11)
+  name varchar(150)
+  parent_folder_id int(10)
+  dag_id int(11)
+  role_id int(10)
+  admin_only tinyint(1)
+  deleted tinyint(1)
+  Indexes {
+    (folder_id) [pk]
+  }
+}
+
+Table redcap_docs_folders_files {
+  docs_id int(10)
+  folder_id int(10)
+  Indexes {
+    (docs_id) [pk]
+    (docs_id,folder_id) [unique, name: "docs_folder_id"]
+  }
+}
+
+Table redcap_docs_share {
+  docs_id int(10)
+  hash varchar(100)
+  Indexes {
+    (docs_id) [pk]
+    (hash) [unique, name: "hash"]
+  }
+}
+
+Table redcap_docs_to_edocs {
+  docs_id int(11)
+  doc_id int(11)
+  Indexes {
+    (docs_id,doc_id) [pk]
+  }
+}
+
+Table redcap_econsent {
+  consent_id int(10)
+  project_id int(10)
+  survey_id int(10)
+  version varchar(64)
+  active tinyint(1)
+  type_label varchar(64)
+  custom_econsent_label text
+  notes text
+  firstname_field varchar(100)
+  firstname_event_id int(11)
+  lastname_field varchar(100)
+  lastname_event_id int(11)
+  dob_field varchar(100)
+  dob_event_id int(11)
+  allow_edit tinyint(1)
+  signature_field1 varchar(100)
+  signature_field2 varchar(100)
+  signature_field3 varchar(100)
+  signature_field4 varchar(100)
+  signature_field5 varchar(100)
+  consent_form_location_field varchar(100)
+  Indexes {
+    (consent_id) [pk]
+    (survey_id) [unique, name: "survey_id"]
+  }
+}
+
+Table redcap_econsent_forms {
+  consent_form_id int(10)
+  consent_id int(10)
+  version varchar(64)
+  consent_form_active tinyint(1)
+  creation_time datetime
+  uploader int(10)
+  consent_form_pdf_doc_id int(10)
+  consent_form_richtext mediumtext
+  consent_form_filter_dag_id int(10)
+  consent_form_filter_lang_id varchar(50)
+  Indexes {
+    (consent_form_id) [pk]
+    (consent_id,version,consent_form_active,consent_form_filter_dag_id,consent_form_filter_lang_id) [unique, name: "consent_id_version_active_dag_lang"]
+  }
+}
+
+Table redcap_edocs_data_mapping {
+  doc_id int(10)
+  project_id int(10)
+  event_id int(10)
+  record varchar(100)
+  field_name varchar(100)
+  instance smallint(4)
+  Indexes {
+    (doc_id) [pk]
+  }
+}
+
+Table redcap_edocs_metadata {
+  doc_id int(10)
+  stored_name varchar(255)
+  mime_type varchar(255)
+  doc_name varchar(255)
+  doc_size int(10)
+  file_extension varchar(20)
+  gzipped int(1)
+  project_id int(10)
+  stored_date datetime
+  delete_date datetime
+  date_deleted_server datetime
+  Indexes {
+    (doc_id) [pk]
+  }
+}
+
+Table redcap_ehr_access_tokens {
+  patient varchar(191)
+  mrn varchar(191)
+  token_owner int(11)
+  expiration datetime
+  access_token text
+  refresh_token text
+  permission_Patient tinyint(1)
+  permission_Observation tinyint(1)
+  permission_Condition tinyint(1)
+  permission_MedicationOrder tinyint(1)
+  permission_AllergyIntolerance tinyint(1)
+  ehr_id int(11)
+  Indexes {
+    (token_owner,mrn,ehr_id) [unique, name: "token_owner_mrn_ehr"]
+    (token_owner,patient,ehr_id) [unique, name: "token_owner_patient_ehr"]
+  }
+}
+
+Table redcap_ehr_datamart_revisions {
+  id int(11)
+  project_id int(11)
+  request_id int(11)
+  user_id int(11)
+  mrns mediumtext
+  date_min date
+  date_max date
+  fields mediumtext
+  date_range_categories text
+  approved tinyint(1)
+  is_deleted tinyint(1)
+  created_at timestamp
+  executed_at timestamp
+  Indexes {
+    (id) [pk]
+    (request_id) [unique, name: "request_id"]
+  }
+}
+
+Table redcap_ehr_fhir_logs {
+  id int(11)
+  user_id int(11)
+  fhir_id varchar(191)
+  project_id int(11)
+  resource_type varchar(191)
+  status int(11)
+  environment varchar(191)
+  created_at datetime
+  mrn varchar(191)
+  ehr_id int(11)
+  Indexes {
+    (id) [pk]
+  }
+}
+
+Table redcap_ehr_import_counts {
+  id int(11)
+  ts datetime
+  type enum('CDP','CDM','CDP-I')
+  adjudicated tinyint(1)
+  project_id int(11)
+  record varchar(100)
+  counts_Patient mediumint(7)
+  counts_Observation mediumint(7)
+  counts_Condition mediumint(7)
+  counts_Medication mediumint(7)
+  counts_AllergyIntolerance mediumint(7)
+  counts_Encounter mediumint(7)
+  counts_Immunization mediumint(7)
+  counts_AdverseEvent mediumint(7)
+  Indexes {
+    (id) [pk]
+  }
+}
+
+Table redcap_ehr_resource_import_details {
+  count_id int(11)
+  ehr_import_count_id int(11)
+  category varchar(50)
+  resource varchar(50)
+  count mediumint(7)
+  Indexes {
+    (count_id) [pk]
+  }
+}
+
+Table redcap_ehr_resource_imports {
+  id int(11)
+  ts datetime
+  type enum('CDP','CDM','CDP-I')
+  adjudicated tinyint(1)
+  project_id int(11)
+  record varchar(100)
+  ehr_id int(11)
+  Indexes {
+    (id) [pk]
+  }
+}
+
+Table redcap_ehr_settings {
+  ehr_id int(11)
+  order int(10)
+  ehr_name varchar(255)
+  client_id varchar(255)
+  client_secret varchar(255)
+  fhir_base_url varchar(255)
+  fhir_token_url varchar(255)
+  fhir_authorize_url varchar(255)
+  fhir_identity_provider varchar(255)
+  patient_identifier_string varchar(255)
+  fhir_custom_auth_params varchar(255)
+  Indexes {
+    (ehr_id) [pk]
+  }
+}
+
+Table redcap_ehr_token_rules {
+  id int(11)
+  project_id int(11)
+  user_id int(11)
+  priority int(11)
+  allow tinyint(1)
+  created_at datetime
+  updated_at datetime
+  Indexes {
+    (id) [pk]
+    (project_id,user_id) [unique, name: "project_id_userid"]
+  }
+}
+
+Table redcap_ehr_user_map {
+  ehr_username varchar(191)
+  redcap_userid int(11)
+  ehr_id int(11)
+  Indexes {
+    (ehr_id,ehr_username) [unique, name: "unique_ehr_username"]
+    (ehr_id,redcap_userid) [unique, name: "unique_redcap_userid"]
+  }
+}
+
+Table redcap_ehr_user_projects {
+  project_id int(11)
+  redcap_userid int(11)
+  Indexes {
+    (project_id,redcap_userid) [unique, name: "project_id_userid"]
+  }
+}
+
+Table redcap_email_users_messages {
+  id int(11)
+  subject text
+  body text
+  sent_by int(11)
+  created_at datetime
+  Indexes {
+    (id) [pk]
+  }
+}
+
+Table redcap_email_users_queries {
+  id int(11)
+  name text
+  description text
+  query text
+  created_at datetime
+  Indexes {
+    (id) [pk]
+  }
+}
+
+Table redcap_error_log {
+  error_id int(10)
+  log_view_id bigint(19)
+  time_of_error datetime
+  error text
+  Indexes {
+    (error_id) [pk]
+  }
+}
+
+Table redcap_esignatures {
+  esign_id int(11)
+  project_id int(10)
+  record varchar(100)
+  event_id int(10)
+  form_name varchar(100)
+  instance smallint(4)
+  username varchar(255)
+  timestamp datetime
+  Indexes {
+    (esign_id) [pk]
+    (project_id,record,event_id,form_name,instance) [unique, name: "proj_rec_event_form_instance"]
+  }
+}
+
+Table redcap_events_arms {
+  arm_id int(10)
+  project_id int(10)
+  arm_num int(2)
+  arm_name varchar(50)
+  Indexes {
+    (arm_id) [pk]
+    (project_id,arm_num) [unique, name: "proj_arm_num"]
+  }
+}
+
+Table redcap_events_calendar {
+  cal_id int(10)
+  record varchar(50)
+  project_id int(10)
+  event_id int(10)
+  baseline_date date
+  group_id int(10)
+  event_date date
+  event_time varchar(5)
+  event_status int(2)
+  note_type int(2)
+  notes text
+  extra_notes text
+  Indexes {
+    (cal_id) [pk]
+  }
+}
+
+Table redcap_events_calendar_feed {
+  feed_id int(10)
+  project_id int(10)
+  record varchar(100)
+  userid int(11)
+  hash varchar(100)
+  Indexes {
+    (feed_id) [pk]
+    (hash) [unique, name: "hash"]
+    (project_id,record,userid) [unique, name: "project_record_user"]
+  }
+}
+
+Table redcap_events_forms {
+  event_id int(10)
+  form_name varchar(100)
+  Indexes {
+    (event_id,form_name) [unique, name: "event_form"]
+  }
+}
+
+Table redcap_events_metadata {
+  event_id int(10)
+  arm_id int(10)
+  day_offset float
+  offset_min float
+  offset_max float
+  descrip varchar(64)
+  external_id varchar(255)
+  custom_event_label text
+  Indexes {
+    (event_id) [pk]
+  }
+}
+
+Table redcap_events_repeat {
+  event_id int(10)
+  form_name varchar(100)
+  custom_repeat_form_label text
+  Indexes {
+    (event_id,form_name) [unique, name: "event_id_form"]
+  }
+}
+
+Table redcap_external_links {
+  ext_id int(10)
+  project_id int(10)
+  link_order int(5)
+  link_url text
+  link_label text
+  open_new_window int(10)
+  link_type enum('LINK','POST_AUTHKEY','REDCAP_PROJECT')
+  user_access enum('ALL','DAG','SELECTED')
+  append_record_info int(1)
+  append_pid int(1)
+  link_to_project_id int(10)
+  Indexes {
+    (ext_id) [pk]
+  }
+}
+
+Table redcap_external_links_dags {
+  ext_id int(11)
+  group_id int(10)
+  Indexes {
+    (ext_id,group_id) [pk]
+  }
+}
+
+Table redcap_external_links_exclude_projects {
+  ext_id int(11)
+  project_id int(10)
+  Indexes {
+    (ext_id,project_id) [pk]
+  }
+}
+
+Table redcap_external_links_users {
+  ext_id int(11)
+  username varchar(191)
+  Indexes {
+    (ext_id,username) [pk]
+  }
+}
+
+Table redcap_external_module_settings {
+  external_module_id int(11)
+  project_id int(11)
+  key varchar(255)
+  type varchar(12)
+  value mediumtext
+}
+
+Table redcap_external_modules {
+  external_module_id int(11)
+  directory_prefix varchar(191)
+  Indexes {
+    (external_module_id) [pk]
+    (directory_prefix) [unique, name: "directory_prefix"]
+  }
+}
+
+Table redcap_external_modules_downloads {
+  module_name varchar(191)
+  module_id int(11)
+  time_downloaded datetime
+  time_deleted datetime
+  Indexes {
+    (module_name) [pk]
+    (module_id) [unique, name: "module_id"]
+  }
+}
+
+Table redcap_external_modules_log {
+  log_id bigint(20)
+  timestamp datetime
+  ui_id int(11)
+  ip varchar(100)
+  external_module_id int(11)
+  project_id int(11)
+  record varchar(100)
+  message mediumtext
+  Indexes {
+    (log_id) [pk]
+  }
+}
+
+Table redcap_external_modules_log_parameters {
+  log_id bigint(20)
+  name varchar(255)
+  value mediumtext
+  Indexes {
+    (191) [pk]
+  }
+}
+
+Table redcap_folders {
+  folder_id int(10)
+  ui_id int(10)
+  name varchar(64)
+  position int(10)
+  foreground varchar(6)
+  background varchar(6)
+  collapsed tinyint(1)
+  Indexes {
+    (folder_id) [pk]
+    (ui_id,name) [unique, name: "ui_id_name_uniq"]
+  }
+}
+
+Table redcap_folders_projects {
+  ui_id int(10)
+  project_id int(10)
+  folder_id int(10)
+  Indexes {
+    (ui_id,project_id,folder_id) [unique, name: "ui_id_project_folder"]
+  }
+}
+
+Table redcap_form_display_logic_conditions {
+  control_id int(10)
+  project_id int(10)
+  control_condition text
+  apply_to_data_entry tinyint(1)
+  apply_to_survey tinyint(1)
+  apply_to_mycap tinyint(1)
+  Indexes {
+    (control_id) [pk]
+  }
+}
+
+Table redcap_form_display_logic_targets {
+  control_id int(10)
+  form_name varchar(100)
+  event_id int(10)
+  Indexes {
+    (event_id,form_name,control_id) [unique, name: "event_form_control"]
+  }
+}
+
+Table redcap_forms {
+  project_id int(10)
+  form_name varchar(100)
+  custom_css text
+  Indexes {
+    (project_id,form_name) [unique, name: "proj_form"]
+  }
+}
+
+Table redcap_forms_temp {
+  project_id int(10)
+  form_name varchar(100)
+  custom_css text
+  Indexes {
+    (project_id,form_name) [unique, name: "proj_form"]
+  }
+}
+
+Table redcap_history_size {
+  date date
+  size_db float
+  size_files float
+  Indexes {
+    (date) [pk]
+  }
+}
+
+Table redcap_history_version {
+  date date
+  redcap_version varchar(10)
+  Indexes {
+    (date,redcap_version) [pk]
+  }
+}
+
+Table redcap_instrument_zip {
+  iza_id int(10)
+  instrument_id varchar(191)
+  upload_count smallint(5)
+  Indexes {
+    (iza_id,instrument_id) [pk]
+  }
+}
+
+Table redcap_instrument_zip_authors {
+  iza_id int(10)
+  author_name varchar(191)
+  Indexes {
+    (iza_id) [pk]
+    (author_name) [unique, name: "author_name"]
+  }
+}
+
+Table redcap_instrument_zip_origins {
+  server_name varchar(191)
+  upload_count smallint(5)
+  Indexes {
+    (server_name) [pk]
+  }
+}
+
+Table redcap_ip_banned {
+  ip varchar(100)
+  time_of_ban timestamp
+  Indexes {
+    (ip) [pk]
+  }
+}
+
+Table redcap_ip_cache {
+  ip_hash varchar(32)
+  timestamp timestamp
+}
+
+Table redcap_library_map {
+  project_id int(10)
+  form_name varchar(100)
+  type int(11)
+  library_id int(10)
+  upload_timestamp datetime
+  acknowledgement text
+  acknowledgement_cache datetime
+  promis_key varchar(255)
+  scoring_type enum('EACH_ITEM','END_ONLY')
+  battery tinyint(1)
+  promis_battery_key varchar(255)
+  Indexes {
+    (project_id,form_name,type,library_id) [pk]
+  }
+}
+
+Table redcap_locking_data {
+  ld_id int(11)
+  project_id int(10)
+  record varchar(100)
+  event_id int(10)
+  form_name varchar(100)
+  instance smallint(4)
+  username varchar(191)
+  timestamp datetime
+  Indexes {
+    (ld_id) [pk]
+    (project_id,record,event_id,form_name,instance) [unique, name: "proj_rec_event_form_instance"]
+  }
+}
+
+Table redcap_locking_labels {
+  ll_id int(11)
+  project_id int(11)
+  form_name varchar(100)
+  label text
+  display int(1)
+  display_esignature int(1)
+  Indexes {
+    (ll_id) [pk]
+    (project_id,form_name) [unique, name: "project_form"]
+  }
+}
+
+Table redcap_locking_records {
+  lr_id int(11)
+  project_id int(10)
+  record varchar(100)
+  arm_id int(10)
+  username varchar(191)
+  timestamp datetime
+  Indexes {
+    (lr_id) [pk]
+    (arm_id,record) [unique, name: "arm_id_record"]
+  }
+}
+
+Table redcap_locking_records_pdf_archive {
+  doc_id int(10)
+  project_id int(10)
+  record varchar(100)
+  arm_id int(10)
+  Indexes {
+    (doc_id) [unique, name: "doc_id"]
+  }
+}
+
+Table redcap_log_event {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event10 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event11 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event12 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event2 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event3 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event4 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event5 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event6 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event7 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event8 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_event9 {
+  log_event_id int(11)
+  project_id int(10)
+  ts bigint(14)
+  user varchar(255)
+  ip varchar(100)
+  page varchar(255)
+  event enum('UPDATE','INSERT','DELETE','SELECT','ERROR','LOGIN','LOGOUT','OTHER','DATA_EXPORT','DOC_UPLOAD','DOC_DELETE','MANAGE','LOCK_RECORD','ESIGNATURE')
+  object_type varchar(128)
+  sql_log mediumtext
+  pk varchar(200)
+  event_id int(10)
+  data_values text
+  description varchar(100)
+  legacy int(1)
+  change_reason text
+  Indexes {
+    (log_event_id) [pk]
+  }
+}
+
+Table redcap_log_view {
+  log_view_id bigint(19)
+  ts timestamp
+  user varchar(255)
+  event enum('LOGIN_SUCCESS','LOGIN_FAIL','LOGOUT','PAGE_VIEW')
+  ip varchar(100)
+  browser_name varchar(255)
+  browser_version varchar(255)
+  full_url text
+  page varchar(255)
+  project_id int(10)
+  event_id int(10)
+  record varchar(255)
+  form_name varchar(100)
+  miscellaneous text
+  session_id varchar(32)
+  Indexes {
+    (log_view_id) [pk]
+  }
+}
+
+Table redcap_log_view_old {
+  log_view_id int(11)
+  ts timestamp
+  user varchar(255)
+  event enum('LOGIN_SUCCESS','LOGIN_FAIL','LOGOUT','PAGE_VIEW')
+  ip varchar(100)
+  browser_name varchar(255)
+  browser_version varchar(255)
+  full_url text
+  page varchar(255)
+  project_id int(10)
+  event_id int(10)
+  record varchar(255)
+  form_name varchar(100)
+  miscellaneous text
+  session_id varchar(32)
+  Indexes {
+    (log_view_id) [pk]
+  }
+}
+
+Table redcap_log_view_requests {
+  lvr_id bigint(19)
+  log_view_id bigint(19)
+  mysql_process_id int(10)
+  php_process_id int(10)
+  script_execution_time float
+  is_ajax tinyint(1)
+  is_cron tinyint(1)
+  ui_id int(11)
+  Indexes {
+    (lvr_id) [pk]
+    (log_view_id) [unique, name: "log_view_id"]
+  }
+}
+
+Table redcap_messages {
+  message_id int(10)
+  thread_id int(10)
+  sent_time datetime
+  author_user_id int(10)
+  message_body text
+  attachment_doc_id int(10)
+  stored_url varchar(256)
+  Indexes {
+    (message_id) [pk]
+  }
+}
+
+Table redcap_messages_recipients {
+  recipient_id int(10)
+  thread_id int(10)
+  recipient_user_id int(10)
+  all_users tinyint(1)
+  prioritize tinyint(1)
+  conv_leader tinyint(1)
+  Indexes {
+    (recipient_id) [pk]
+    (recipient_user_id,thread_id) [unique, name: "recipient_user_thread_id"]
+  }
+}
+
+Table redcap_messages_status {
+  status_id int(10)
+  message_id int(10)
+  recipient_id int(10)
+  recipient_user_id int(10)
+  urgent tinyint(1)
+  Indexes {
+    (status_id) [pk]
+  }
+}
+
+Table redcap_messages_threads {
+  thread_id int(10)
+  type enum('CHANNEL','NOTIFICATION','CONVERSATION')
+  channel_name varchar(100)
+  invisible tinyint(1)
+  archived tinyint(1)
+  project_id int(11)
+  Indexes {
+    (thread_id) [pk]
+  }
+}
+
+Table redcap_metadata {
+  project_id int(10)
+  field_name varchar(100)
+  field_phi varchar(5)
+  form_name varchar(100)
+  form_menu_description varchar(255)
+  field_order float
+  field_units varchar(50)
+  element_preceding_header mediumtext
+  element_type varchar(50)
+  element_label mediumtext
+  element_enum mediumtext
+  element_note mediumtext
+  element_validation_type varchar(255)
+  element_validation_min varchar(255)
+  element_validation_max varchar(255)
+  element_validation_checktype varchar(50)
+  branching_logic text
+  field_req int(1)
+  edoc_id int(10)
+  edoc_display_img int(1)
+  custom_alignment enum('LH','LV','RH','RV')
+  stop_actions text
+  question_num varchar(50)
+  grid_name varchar(100)
+  grid_rank int(1)
+  misc mediumtext
+  video_url varchar(255)
+  video_display_inline tinyint(1)
+  Indexes {
+    (project_id,field_name) [pk]
+  }
+}
+
+Table redcap_metadata_archive {
+  project_id int(10)
+  field_name varchar(100)
+  field_phi varchar(5)
+  form_name varchar(100)
+  form_menu_description varchar(255)
+  field_order float
+  field_units varchar(50)
+  element_preceding_header mediumtext
+  element_type varchar(50)
+  element_label mediumtext
+  element_enum mediumtext
+  element_note mediumtext
+  element_validation_type varchar(255)
+  element_validation_min varchar(255)
+  element_validation_max varchar(255)
+  element_validation_checktype varchar(50)
+  branching_logic text
+  field_req int(1)
+  edoc_id int(10)
+  edoc_display_img int(1)
+  custom_alignment enum('LH','LV','RH','RV')
+  stop_actions text
+  question_num varchar(50)
+  grid_name varchar(100)
+  grid_rank int(1)
+  misc mediumtext
+  video_url varchar(255)
+  video_display_inline tinyint(1)
+  pr_id int(10)
+  Indexes {
+    (project_id,field_name,pr_id) [unique, name: "project_field_prid"]
+  }
+}
+
+Table redcap_metadata_prod_revisions {
+  pr_id int(10)
+  project_id int(10)
+  ui_id_requester int(10)
+  ui_id_approver int(10)
+  ts_req_approval datetime
+  ts_approved datetime
+  Indexes {
+    (pr_id) [pk]
+  }
+}
+
+Table redcap_metadata_temp {
+  project_id int(10)
+  field_name varchar(100)
+  field_phi varchar(5)
+  form_name varchar(100)
+  form_menu_description varchar(255)
+  field_order float
+  field_units varchar(50)
+  element_preceding_header mediumtext
+  element_type varchar(50)
+  element_label mediumtext
+  element_enum mediumtext
+  element_note mediumtext
+  element_validation_type varchar(255)
+  element_validation_min varchar(255)
+  element_validation_max varchar(255)
+  element_validation_checktype varchar(50)
+  branching_logic text
+  field_req int(1)
+  edoc_id int(10)
+  edoc_display_img int(1)
+  custom_alignment enum('LH','LV','RH','RV')
+  stop_actions text
+  question_num varchar(50)
+  grid_name varchar(100)
+  grid_rank int(1)
+  misc mediumtext
+  video_url varchar(255)
+  video_display_inline tinyint(1)
+  Indexes {
+    (project_id,field_name) [pk]
+  }
+}
+
+Table redcap_mobile_app_devices {
+  device_id int(10)
+  uuid varchar(128)
+  project_id int(10)
+  nickname varchar(255)
+  revoked tinyint(4)
+  Indexes {
+    (device_id) [pk]
+    (uuid,project_id) [unique, name: "uuid_project_id"]
+  }
+}
+
+Table redcap_mobile_app_files {
+  af_id int(10)
+  doc_id int(10)
+  type enum('ESCAPE_HATCH','LOGGING')
+  user_id int(10)
+  device_id int(10)
+  Indexes {
+    (af_id) [pk]
+  }
+}
+
+Table redcap_mobile_app_log {
+  mal_id int(10)
+  project_id int(10)
+  ui_id int(11)
+  log_event_id int(10)
+  device_id int(10)
+  event enum('INIT_PROJECT','INIT_DOWNLOAD_DATA','INIT_DOWNLOAD_DATA_PARTIAL','REINIT_PROJECT','REINIT_DOWNLOAD_DATA','REINIT_DOWNLOAD_DATA_PARTIAL','SYNC_DATA')
+  details text
+  longitude double
+  latitude double
+  Indexes {
+    (mal_id) [pk]
+  }
+}
+
+Table redcap_multilanguage_config {
+  project_id int(10)
+  lang_id varchar(50)
+  name varchar(150)
+  value mediumtext
+  Indexes {
+    (project_id,lang_id,name) [unique, name: "project_lang_name"]
+  }
+}
+
+Table redcap_multilanguage_config_temp {
+  project_id int(10)
+  lang_id varchar(50)
+  name varchar(150)
+  value mediumtext
+  Indexes {
+    (project_id,lang_id,name) [unique, name: "project_lang_name"]
+  }
+}
+
+Table redcap_multilanguage_metadata {
+  project_id int(10)
+  lang_id varchar(50)
+  type varchar(150)
+  name varchar(150)
+  index varchar(150)
+  hash char(10)
+  value text
+  Indexes {
+    (project_id,lang_id,type,name,index) [unique, name: "project_lang_type_name_index"]
+  }
+}
+
+Table redcap_multilanguage_metadata_temp {
+  project_id int(10)
+  lang_id varchar(50)
+  type varchar(150)
+  name varchar(150)
+  index varchar(150)
+  hash char(10)
+  value text
+  Indexes {
+    (project_id,lang_id,type,name,index) [unique, name: "project_lang_type_name_index"]
+  }
+}
+
+Table redcap_multilanguage_snapshots {
+  snapshot_id int(10)
+  project_id int(10)
+  edoc_id int(10)
+  created_by int(10)
+  deleted_by int(10)
+  Indexes {
+    (snapshot_id) [pk]
+  }
+}
+
+Table redcap_multilanguage_ui {
+  project_id int(10)
+  lang_id varchar(50)
+  item varchar(150)
+  hash char(10)
+  translation text
+  Indexes {
+    (project_id,lang_id,item) [unique, name: "project_lang_item"]
+  }
+}
+
+Table redcap_multilanguage_ui_temp {
+  project_id int(10)
+  lang_id varchar(50)
+  item varchar(150)
+  hash char(10)
+  translation text
+  Indexes {
+    (project_id,lang_id,item) [unique, name: "project_lang_item"]
+  }
+}
+
+Table redcap_mycap_aboutpages {
+  page_id int(10)
+  project_id int(10)
+  identifier varchar(100)
+  page_title varchar(100)
+  page_content text
+  sub_type varchar(100)
+  image_type varchar(255)
+  system_image_name varchar(255)
+  custom_logo int(10)
+  page_order int(10)
+  dag_id int(11)
+  Indexes {
+    (page_id) [pk]
+  }
+}
+
+Table redcap_mycap_contacts {
+  contact_id int(10)
+  project_id int(10)
+  identifier varchar(100)
+  contact_header varchar(100)
+  contact_title varchar(100)
+  phone_number varchar(255)
+  email varchar(255)
+  website text
+  additional_info text
+  contact_order int(10)
+  dag_id int(11)
+  Indexes {
+    (contact_id) [pk]
+  }
+}
+
+Table redcap_mycap_links {
+  link_id int(10)
+  project_id int(10)
+  identifier varchar(100)
+  link_name varchar(100)
+  link_url text
+  link_icon varchar(100)
+  append_project_code int(1)
+  append_participant_code int(1)
+  link_order int(10)
+  dag_id int(11)
+  Indexes {
+    (link_id) [pk]
+  }
+}
+
+Table redcap_mycap_message_notifications {
+  notification_id int(10)
+  project_id int(10)
+  dag_id int(10)
+  notify_user int(1)
+  user_emails text
+  custom_email_text text
+  Indexes {
+    (notification_id) [pk]
+  }
+}
+
+Table redcap_mycap_messages {
+  uuid char(36)
+  project_id int(10)
+  type varchar(45)
+  from_server tinyint(1)
+  from varchar(191)
+  to varchar(191)
+  title varchar(255)
+  body text
+  sent_date datetime
+  received_date datetime
+  read_date datetime
+  processed tinyint(1)
+  processed_by varchar(191)
+  Indexes {
+    (uuid) [pk]
+  }
+}
+
+Table redcap_mycap_participants {
+  code varchar(36)
+  project_id int(10)
+  record varchar(100)
+  event_id int(10)
+  join_date datetime
+  join_date_utc datetime
+  timezone varchar(20)
+  baseline_date datetime
+  push_notification_ids text
+  is_deleted tinyint(1)
+  Indexes {
+    (code) [pk]
+  }
+}
+
+Table redcap_mycap_projectfiles {
+  project_code varchar(36)
+  doc_id int(10)
+  name varchar(255)
+  category int(10)
+  Indexes {
+    (project_code,doc_id) [pk]
+  }
+}
+
+Table redcap_mycap_projects {
+  code varchar(36)
+  hmac_key varchar(64)
+  project_id int(10)
+  name varchar(255)
+  allow_new_participants tinyint(1)
+  participant_custom_field varchar(100)
+  participant_custom_label text
+  participant_allow_condition text
+  config mediumtext
+  baseline_date_field text
+  baseline_date_config mediumtext
+  status int(1)
+  converted_to_flutter tinyint(1)
+  flutter_conversion_time datetime
+  event_display_format enum('ID','LABEL','NONE')
+  notification_time time
+  acknowledged_app_link tinyint(1)
+  prevent_lang_switch_mtb tinyint(1)
+  last_enabled_on datetime
+  Indexes {
+    (code) [pk]
+  }
+}
+
+Table redcap_mycap_syncissuefiles {
+  uuid char(36)
+  doc_id int(10)
+  Indexes {
+    (doc_id,uuid) [pk]
+  }
+}
+
+Table redcap_mycap_syncissues {
+  uuid char(36)
+  participant_code varchar(36)
+  project_code varchar(36)
+  received_date datetime
+  payload mediumtext
+  instrument varchar(100)
+  event_id int(10)
+  error_type int(1)
+  error_message varchar(4000)
+  resolved tinyint(1)
+  resolved_by varchar(191)
+  resolved_comment varchar(2000)
+  Indexes {
+    (uuid) [pk]
+  }
+}
+
+Table redcap_mycap_tasks {
+  task_id int(10)
+  project_id int(10)
+  form_name varchar(255)
+  enabled_for_mycap int(1)
+  task_title varchar(255)
+  question_format varchar(35)
+  card_display varchar(20)
+  x_date_field varchar(255)
+  x_time_field varchar(255)
+  y_numeric_field varchar(255)
+  extended_config_json text
+  Indexes {
+    (task_id) [pk]
+  }
+}
+
+Table redcap_mycap_tasks_schedules {
+  ts_id int(11)
+  task_id int(11)
+  event_id int(11)
+  allow_retro_completion int(1)
+  allow_save_complete_later int(1)
+  include_instruction_step int(1)
+  include_completion_step int(1)
+  instruction_step_title varchar(255)
+  instruction_step_content text
+  completion_step_title varchar(255)
+  completion_step_content text
+  schedule_relative_to varchar(20)
+  schedule_type varchar(20)
+  schedule_frequency varchar(20)
+  schedule_interval_week int(2)
+  schedule_days_of_the_week varchar(255)
+  schedule_interval_month int(2)
+  schedule_days_of_the_month varchar(255)
+  schedule_days_fixed varchar(255)
+  schedule_relative_offset int(10)
+  schedule_ends varchar(60)
+  schedule_end_count int(10)
+  schedule_end_after_days int(10)
+  schedule_end_date date
+  active int(1)
+  Indexes {
+    (ts_id) [pk]
+  }
+}
+
+Table redcap_mycap_themes {
+  theme_id int(10)
+  project_id int(10)
+  primary_color varchar(10)
+  light_primary_color varchar(10)
+  accent_color varchar(10)
+  dark_primary_color varchar(10)
+  light_bg_color varchar(10)
+  theme_type varchar(100)
+  system_type varchar(100)
+  Indexes {
+    (theme_id) [pk]
+  }
+}
+
+Table redcap_new_record_cache {
+  project_id int(10)
+  record varchar(100)
+  creation_time datetime
+  Indexes {
+    (project_id,record) [unique, name: "proj_record"]
+  }
+}
+
+Table redcap_outgoing_email_counts {
+  date date
+  send_count int(10)
+  smtp int(10)
+  sendgrid int(10)
+  mandrill int(10)
+  twilio_sms int(10)
+  mosio_sms int(10)
+  mailgun int(10)
+  Indexes {
+    (date) [pk]
+  }
+}
+
+Table redcap_outgoing_email_sms_identifiers {
+  ident_id int(10)
+  ssq_id int(10)
+  Indexes {
+    (ident_id) [pk]
+    (ssq_id) [unique, name: "ssq_id"]
+  }
+}
+
+Table redcap_outgoing_email_sms_log {
+  email_id int(10)
+  type enum('EMAIL','SMS','VOICE_CALL','SENDGRID_TEMPLATE')
+  category varchar(191)
+  time_sent datetime
+  sender varchar(191)
+  recipients text
+  email_cc text
+  email_bcc text
+  email_subject text
+  message mediumtext
+  message_html mediumtext
+  attachment_names text
+  attachment_doc_ids text
+  project_id int(10)
+  record varchar(100)
+  event_id int(10)
+  instrument varchar(100)
+  instance smallint(4)
+  hash varchar(100)
+  lang_id varchar(50)
+  Indexes {
+    (email_id) [pk]
+    (hash) [unique, name: "hash"]
+  }
+}
+
+Table redcap_page_hits {
+  date date
+  page_name varchar(100)
+  page_hits float
+  Indexes {
+    (date,page_name) [unique, name: "date"]
+  }
+}
+
+Table redcap_pdf_image_cache {
+  pdf_doc_id int(10)
+  page int(5)
+  num_pages int(5)
+  image_doc_id int(10)
+  expiration datetime
+  Indexes {
+    (pdf_doc_id,page) [unique, name: "pdf_doc_id_page"]
+  }
+}
+
+Table redcap_pdf_snapshots {
+  snapshot_id int(10)
+  project_id int(10)
+  active tinyint(1)
+  name varchar(64)
+  custom_filename_prefix text
+  consent_id int(10)
+  trigger_surveycomplete_survey_id int(10)
+  trigger_surveycomplete_event_id int(10)
+  trigger_logic text
+  selected_forms_events text
+  pdf_save_to_file_repository tinyint(1)
+  pdf_save_to_field varchar(100)
+  pdf_save_to_event_id int(10)
+  pdf_save_translated tinyint(1)
+  pdf_compact tinyint(1)
+  Indexes {
+    (snapshot_id) [pk]
+    (consent_id,trigger_surveycomplete_survey_id) [unique, name: "consent_survey_id"]
+  }
+}
+
+Table redcap_pdf_snapshots_triggered {
+  snapshot_id int(10)
+  record varchar(100)
+  Indexes {
+    (snapshot_id,record) [pk]
+  }
+}
+
+Table redcap_project_checklist {
+  list_id int(11)
+  project_id int(10)
+  name varchar(100)
+  Indexes {
+    (list_id) [pk]
+    (project_id,name) [unique, name: "project_name"]
+  }
+}
+
+Table redcap_project_dashboards {
+  dash_id int(10)
+  project_id int(10)
+  title text
+  body mediumtext
+  dash_order int(3)
+  user_access enum('ALL','SELECTED')
+  hash varchar(11)
+  short_url varchar(100)
+  is_public tinyint(1)
+  cache_time datetime
+  cache_content longtext
+  Indexes {
+    (dash_id) [pk]
+    (hash) [unique, name: "hash"]
+    (project_id,dash_order) [unique, name: "project_dash_order"]
+  }
+}
+
+Table redcap_project_dashboards_access_dags {
+  dash_id int(10)
+  group_id int(10)
+  Indexes {
+    (dash_id,group_id) [pk]
+  }
+}
+
+Table redcap_project_dashboards_access_roles {
+  dash_id int(10)
+  role_id int(10)
+  Indexes {
+    (dash_id,role_id) [pk]
+  }
+}
+
+Table redcap_project_dashboards_access_users {
+  dash_id int(10)
+  username varchar(191)
+  Indexes {
+    (dash_id,username) [pk]
+  }
+}
+
+Table redcap_project_dashboards_folders {
+  folder_id int(10)
+  project_id int(10)
+  name varchar(64)
+  position smallint(4)
+  Indexes {
+    (folder_id) [pk]
+    (position,project_id) [unique, name: "position_project_id"]
+  }
+}
+
+Table redcap_project_dashboards_folders_items {
+  folder_id int(10)
+  dash_id int(10)
+  Indexes {
+    (folder_id,dash_id) [unique, name: "folder_id_dash_id"]
+  }
+}
+
+Table redcap_projects {
+  project_id int(10)
+  project_name varchar(100)
+  app_title text
+  status int(1)
+  creation_time datetime
+  production_time datetime
+  inactive_time datetime
+  completed_time datetime
+  completed_by varchar(100)
+  data_locked tinyint(1)
+  log_event_table varchar(20)
+  data_table varchar(20)
+  created_by int(10)
+  draft_mode int(1)
+  surveys_enabled int(1)
+  repeatforms int(1)
+  scheduling int(1)
+  purpose int(2)
+  purpose_other text
+  show_which_records int(1)
+  __SALT__ varchar(10)
+  count_project int(1)
+  investigators text
+  project_note mediumtext
+  online_offline int(1)
+  auth_meth varchar(100)
+  double_data_entry int(1)
+  project_language varchar(255)
+  project_encoding enum('japanese_sjis','chinese_utf8','chinese_utf8_traditional')
+  is_child_of varchar(255)
+  date_shift_max int(10)
+  institution text
+  site_org_type text
+  grant_cite text
+  project_contact_name text
+  project_contact_email text
+  headerlogo text
+  auto_inc_set int(1)
+  custom_data_entry_note text
+  custom_index_page_note text
+  order_id_by varchar(255)
+  custom_reports mediumtext
+  report_builder mediumtext
+  disable_data_entry int(1)
+  google_translate_default varchar(10)
+  require_change_reason int(1)
+  dts_enabled int(1)
+  project_pi_firstname varchar(255)
+  project_pi_mi varchar(255)
+  project_pi_lastname varchar(255)
+  project_pi_email varchar(255)
+  project_pi_alias varchar(255)
+  project_pi_username varchar(255)
+  project_pi_pub_exclude int(1)
+  project_pub_matching_institution text
+  project_irb_number varchar(255)
+  project_grant_number varchar(255)
+  history_widget_enabled int(1)
+  secondary_pk varchar(100)
+  secondary_pk_display_value tinyint(1)
+  secondary_pk_display_label tinyint(1)
+  custom_record_label text
+  display_project_logo_institution int(1)
+  imported_from_rs int(1)
+  display_today_now_button int(1)
+  auto_variable_naming int(1)
+  randomization int(1)
+  enable_participant_identifiers int(1)
+  survey_email_participant_field varchar(255)
+  survey_phone_participant_field varchar(255)
+  data_entry_trigger_url text
+  template_id int(10)
+  date_deleted datetime
+  data_resolution_enabled int(1)
+  field_comment_edit_delete int(1)
+  drw_hide_closed_queries_from_dq_results tinyint(1)
+  realtime_webservice_enabled int(1)
+  realtime_webservice_type enum('CUSTOM','FHIR')
+  realtime_webservice_offset_days float
+  realtime_webservice_offset_plusminus enum('+','-','+-')
+  last_logged_event datetime
+  last_logged_event_exclude_exports datetime
+  edoc_upload_max int(10)
+  file_attachment_upload_max int(10)
+  survey_queue_custom_text text
+  survey_queue_hide tinyint(1)
+  survey_auth_enabled int(1)
+  survey_auth_field1 varchar(100)
+  survey_auth_event_id1 int(10)
+  survey_auth_field2 varchar(100)
+  survey_auth_event_id2 int(10)
+  survey_auth_field3 varchar(100)
+  survey_auth_event_id3 int(10)
+  survey_auth_min_fields enum('1','2','3')
+  survey_auth_apply_all_surveys int(1)
+  survey_auth_custom_message text
+  survey_auth_fail_limit int(2)
+  survey_auth_fail_window int(3)
+  twilio_enabled int(1)
+  twilio_modules_enabled enum('SURVEYS','ALERTS','SURVEYS_ALERTS')
+  twilio_hide_in_project tinyint(1)
+  twilio_account_sid varchar(64)
+  twilio_auth_token varchar(64)
+  twilio_from_number bigint(16)
+  twilio_alphanum_sender_id varchar(50)
+  twilio_voice_language varchar(5)
+  twilio_option_voice_initiate tinyint(1)
+  twilio_option_sms_initiate tinyint(1)
+  twilio_option_sms_invite_make_call tinyint(1)
+  twilio_option_sms_invite_receive_call tinyint(1)
+  twilio_option_sms_invite_web tinyint(1)
+  twilio_default_delivery_preference enum('EMAIL','VOICE_INITIATE','SMS_INITIATE','SMS_INVITE_MAKE_CALL','SMS_INVITE_RECEIVE_CALL','SMS_INVITE_WEB')
+  twilio_request_inspector_checked datetime
+  twilio_request_inspector_enabled int(1)
+  twilio_append_response_instructions int(1)
+  twilio_multiple_sms_behavior enum('OVERWRITE','CHOICE','FIRST')
+  twilio_delivery_preference_field_map varchar(100)
+  mosio_api_key varchar(100)
+  mosio_hide_in_project tinyint(1)
+  two_factor_exempt_project tinyint(1)
+  two_factor_force_project tinyint(1)
+  two_factor_project_esign_once_per_session tinyint(1)
+  disable_autocalcs tinyint(1)
+  custom_public_survey_links text
+  pdf_custom_header_text text
+  pdf_show_logo_url tinyint(1)
+  pdf_hide_secondary_field tinyint(1)
+  pdf_hide_record_id tinyint(1)
+  shared_library_enabled tinyint(1)
+  allow_delete_record_from_log tinyint(1)
+  delete_file_repository_export_files int(3)
+  custom_project_footer_text text
+  custom_project_footer_text_link varchar(255)
+  google_recaptcha_enabled tinyint(1)
+  datamart_allow_repeat_revision tinyint(1)
+  datamart_allow_create_revision tinyint(1)
+  datamart_enabled tinyint(1)
+  break_the_glass_enabled tinyint(1)
+  datamart_cron_enabled tinyint(1)
+  datamart_cron_end_date datetime
+  fhir_include_email_address_project tinyint(1)
+  file_upload_vault_enabled tinyint(1)
+  file_upload_versioning_enabled tinyint(1)
+  missing_data_codes text
+  record_locking_pdf_vault_enabled tinyint(1)
+  record_locking_pdf_vault_custom_text text
+  fhir_cdp_auto_adjudication_enabled tinyint(1)
+  fhir_cdp_auto_adjudication_cronjob_enabled tinyint(1)
+  project_dashboard_min_data_points int(10)
+  bypass_branching_erase_field_prompt tinyint(1)
+  protected_email_mode tinyint(1)
+  protected_email_mode_custom_text text
+  protected_email_mode_trigger enum('ALL','PIPING')
+  protected_email_mode_logo int(10)
+  hide_filled_forms tinyint(1)
+  hide_disabled_forms tinyint(1)
+  sendgrid_enabled tinyint(1)
+  sendgrid_project_api_key text
+  mycap_enabled tinyint(1)
+  file_repository_total_size int(10)
+  project_db_character_set varchar(50)
+  project_db_collation varchar(50)
+  ehr_id int(11)
+  allow_econsent_allow_edit tinyint(1)
+  store_in_vault_snapshots_containing_completed_econsent tinyint(1)
+  task_complete_status tinyint(1)
+  local_storage_subfolder varchar(100)
+  openai_endpoint_url_project text
+  openai_api_key_project text
+  openai_api_version_project text
+  geminiai_api_key_project text
+  geminiai_api_model_project text
+  geminiai_api_version_project text
+  max_records_development int(11)
+  rewards_enabled tinyint(1)
+  Indexes {
+    (project_id) [pk]
+    (project_name) [unique, name: "project_name"]
+    (twilio_from_number) [unique, name: "twilio_from_number"]
+  }
+}
+
+Table redcap_projects_external {
+  project_id varchar(32)
+  custom_type varchar(32)
+  app_title text
+  creation_time datetime
+  project_pi_firstname varchar(255)
+  project_pi_mi varchar(255)
+  project_pi_lastname varchar(255)
+  project_pi_email varchar(255)
+  project_pi_alias varchar(255)
+  project_pi_pub_exclude int(1)
+  project_pub_matching_institution text
+  Indexes {
+    (project_id,custom_type) [pk]
+  }
+}
+
+Table redcap_projects_templates {
+  project_id int(10)
+  title text
+  description text
+  enabled int(1)
+  copy_records tinyint(1)
+  Indexes {
+    (project_id) [pk]
+  }
+}
+
+Table redcap_projects_user_hidden {
+  project_id int(10)
+  ui_id int(10)
+  Indexes {
+    (project_id,ui_id) [pk]
+  }
+}
+
+Table redcap_pub_articles {
+  article_id int(10)
+  pubsrc_id int(10)
+  pub_id varchar(16)
+  title text
+  volume varchar(16)
+  issue varchar(16)
+  pages varchar(16)
+  journal text
+  journal_abbrev varchar(64)
+  pub_date date
+  epub_date date
+  Indexes {
+    (article_id) [pk]
+    (pubsrc_id,pub_id) [unique, name: "pubsrc_id"]
+  }
+}
+
+Table redcap_pub_authors {
+  author_id int(10)
+  article_id int(10)
+  author varchar(100)
+  Indexes {
+    (author_id) [pk]
+  }
+}
+
+Table redcap_pub_matches {
+  match_id int(11)
+  article_id int(11)
+  project_id int(11)
+  external_project_id varchar(32)
+  external_custom_type varchar(32)
+  search_term varchar(255)
+  matched int(1)
+  matched_time datetime
+  email_count int(11)
+  email_time datetime
+  unique_hash varchar(32)
+  Indexes {
+    (match_id) [pk]
+    (unique_hash) [unique, name: "unique_hash"]
+  }
+}
+
+Table redcap_pub_mesh_terms {
+  mesh_id int(10)
+  article_id int(10)
+  mesh_term varchar(255)
+  Indexes {
+    (mesh_id) [pk]
+  }
+}
+
+Table redcap_pub_sources {
+  pubsrc_id int(11)
+  pubsrc_name varchar(32)
+  pubsrc_last_crawl_time datetime
+  Indexes {
+    (pubsrc_id) [pk]
+  }
+}
+
+Table redcap_queue {
+  id int(11)
+  key varchar(255)
+  description varchar(191)
+  status enum('waiting','processing','completed','warning','error','canceled')
+  priority int(11)
+  message varchar(191)
+  data blob
+  created_at datetime
+  started_at datetime
+  completed_at datetime
+  Indexes {
+    (id) [pk]
+  }
+}
+
+Table redcap_randomization {
+  rid int(10)
+  project_id int(10)
+  stratified int(1)
+  group_by enum('DAG','FIELD')
+  target_field varchar(100)
+  target_event int(10)
+  source_field1 varchar(100)
+  source_event1 int(10)
+  source_field2 varchar(100)
+  source_event2 int(10)
+  source_field3 varchar(100)
+  source_event3 int(10)
+  source_field4 varchar(100)
+  source_event4 int(10)
+  source_field5 varchar(100)
+  source_event5 int(10)
+  source_field6 varchar(100)
+  source_event6 int(10)
+  source_field7 varchar(100)
+  source_event7 int(10)
+  source_field8 varchar(100)
+  source_event8 int(10)
+  source_field9 varchar(100)
+  source_event9 int(10)
+  source_field10 varchar(100)
+  source_event10 int(10)
+  source_field11 varchar(100)
+  source_event11 int(10)
+  source_field12 varchar(100)
+  source_event12 int(10)
+  source_field13 varchar(100)
+  source_event13 int(10)
+  source_field14 varchar(100)
+  source_event14 int(10)
+  source_field15 varchar(100)
+  source_event15 int(10)
+  trigger_option int(1)
+  trigger_instrument varchar(100)
+  trigger_event_id int(10)
+  trigger_logic text
+  Indexes {
+    (rid) [pk]
+    (project_id,target_field,target_event) [unique, name: "target"]
+  }
+}
+
+Table redcap_randomization_allocation {
+  aid int(10)
+  rid int(10)
+  project_status int(1)
+  is_used_by varchar(100)
+  allocation_time datetime
+  allocation_time_utc datetime
+  group_id int(10)
+  target_field varchar(100)
+  target_field_alt varchar(100)
+  source_field1 varchar(100)
+  source_field2 varchar(100)
+  source_field3 varchar(100)
+  source_field4 varchar(100)
+  source_field5 varchar(100)
+  source_field6 varchar(100)
+  source_field7 varchar(100)
+  source_field8 varchar(100)
+  source_field9 varchar(100)
+  source_field10 varchar(100)
+  source_field11 varchar(100)
+  source_field12 varchar(100)
+  source_field13 varchar(100)
+  source_field14 varchar(100)
+  source_field15 varchar(100)
+  Indexes {
+    (aid) [pk]
+    (rid,project_status,is_used_by) [unique, name: "rid_status_usedby"]
+  }
+}
+
+Table redcap_record_background_delete {
+  delete_id int(10)
+  project_id int(10)
+  user_id int(10)
+  request_time datetime
+  start_time datetime
+  completed_time datetime
+  status enum('INITIALIZING','QUEUED','PROCESSING','COMPLETED','FAILED','CANCELED','PAUSED')
+  form_event mediumtext
+  records_provided int(10)
+  records_deleted int(10)
+  total_errors int(10)
+  total_processing_time int(10)
+  remove_log_details tinyint(1)
+  change_reason text
+  Indexes {
+    (delete_id) [pk]
+  }
+}
+
+Table redcap_record_background_delete_items {
+  dr_id int(10)
+  delete_id int(10)
+  record varchar(100)
+  arm_id int(10)
+  row_status enum('QUEUED','PROCESSING','COMPLETED','FAILED','CANCELED')
+  start_time datetime
+  end_time datetime
+  total_time int(10)
+  error_count int(10)
+  errors text
+  Indexes {
+    (dr_id) [pk]
+    (delete_id,dr_id) [unique, name: "delete_dr_id"]
+  }
+}
+
+Table redcap_record_counts {
+  project_id int(11)
+  record_count int(11)
+  time_of_count timestamp
+  record_list_status enum('NOT_STARTED','PROCESSING','COMPLETE','FIX_SORT')
+  time_of_list_cache timestamp
+  Indexes {
+    (project_id) [pk]
+  }
+}
+
+Table redcap_record_dashboards {
+  rd_id int(11)
+  project_id int(11)
+  title varchar(255)
+  description text
+  filter_logic text
+  orientation enum('V','H')
+  group_by enum('form','event')
+  selected_forms_events text
+  arm int(2)
+  sort_event_id int(11)
+  sort_field_name varchar(100)
+  sort_order enum('ASC','DESC')
+  Indexes {
+    (rd_id) [pk]
+  }
+}
+
+Table redcap_record_list {
+  project_id int(10)
+  arm int(2)
+  record varchar(100)
+  dag_id int(10)
+  sort mediumint(7)
+  Indexes {
+    (project_id,arm,record) [pk]
+  }
+}
+
+Table redcap_reports {
+  report_id int(10)
+  project_id int(10)
+  title text
+  unique_report_name varchar(50)
+  report_order int(3)
+  user_access enum('ALL','SELECTED')
+  user_edit_access enum('ALL','SELECTED')
+  description text
+  combine_checkbox_values tinyint(1)
+  output_dags int(1)
+  output_survey_fields int(1)
+  output_missing_data_codes int(1)
+  remove_line_breaks_in_values int(1)
+  orderby_field1 varchar(100)
+  orderby_sort1 enum('ASC','DESC')
+  orderby_field2 varchar(100)
+  orderby_sort2 enum('ASC','DESC')
+  orderby_field3 varchar(100)
+  orderby_sort3 enum('ASC','DESC')
+  advanced_logic text
+  filter_type enum('RECORD','EVENT')
+  dynamic_filter1 varchar(255)
+  dynamic_filter2 varchar(255)
+  dynamic_filter3 varchar(255)
+  hash varchar(16)
+  short_url varchar(100)
+  is_public tinyint(1)
+  report_display_include_repeating_fields tinyint(1)
+  report_display_header enum('LABEL','VARIABLE','BOTH')
+  report_display_data enum('LABEL','RAW','BOTH')
+  Indexes {
+    (report_id) [pk]
+    (hash) [unique, name: "hash"]
+    (project_id,report_order) [unique, name: "project_report_order"]
+    (unique_report_name,project_id) [unique, name: "unique_report_name_project_id"]
+  }
+}
+
+Table redcap_reports_access_dags {
+  report_id int(10)
+  group_id int(10)
+  Indexes {
+    (report_id,group_id) [pk]
+  }
+}
+
+Table redcap_reports_access_roles {
+  report_id int(10)
+  role_id int(10)
+  Indexes {
+    (report_id,role_id) [pk]
+  }
+}
+
+Table redcap_reports_access_users {
+  report_id int(10)
+  username varchar(191)
+  Indexes {
+    (report_id,username) [pk]
+  }
+}
+
+Table redcap_reports_ai_prompts {
+  project_id int(10)
+  report_id int(10)
+  field_name varchar(100)
+  summary_prompt text
+  Indexes {
+    (project_id,report_id,field_name) [unique, name: "project_id_report_id_field_name"]
+  }
+}
+
+Table redcap_reports_edit_access_dags {
+  report_id int(10)
+  group_id int(10)
+  Indexes {
+    (report_id,group_id) [pk]
+  }
+}
+
+Table redcap_reports_edit_access_roles {
+  report_id int(10)
+  role_id int(10)
+  Indexes {
+    (report_id,role_id) [pk]
+  }
+}
+
+Table redcap_reports_edit_access_users {
+  report_id int(10)
+  username varchar(191)
+  Indexes {
+    (report_id,username) [pk]
+  }
+}
+
+Table redcap_reports_fields {
+  report_id int(10)
+  field_name varchar(100)
+  field_order int(3)
+  limiter_group_operator enum('AND','OR')
+  limiter_event_id int(10)
+  limiter_operator enum('E','NE','GT','GTE','LT','LTE','CHECKED','UNCHECKED','CONTAINS','NOT_CONTAIN','STARTS_WITH','ENDS_WITH')
+  limiter_value varchar(255)
+  Indexes {
+    (report_id,field_name,field_order) [unique, name: "report_id_field_name_order"]
+  }
+}
+
+Table redcap_reports_filter_dags {
+  report_id int(10)
+  group_id int(10)
+  Indexes {
+    (report_id,group_id) [pk]
+  }
+}
+
+Table redcap_reports_filter_events {
+  report_id int(10)
+  event_id int(10)
+  Indexes {
+    (report_id,event_id) [pk]
+  }
+}
+
+Table redcap_reports_folders {
+  folder_id int(10)
+  project_id int(10)
+  name varchar(64)
+  position smallint(4)
+  Indexes {
+    (folder_id) [pk]
+    (position,project_id) [unique, name: "position_project_id"]
+  }
+}
+
+Table redcap_reports_folders_items {
+  folder_id int(10)
+  report_id int(10)
+  Indexes {
+    (folder_id,report_id) [unique, name: "folder_id_report_id"]
+  }
+}
+
+Table redcap_rewards_access_token {
+  access_token_id int(11)
+  access_token text
+  scope text
+  expires_in int(11)
+  token_type varchar(255)
+  created_at datetime
+  project_id int(11)
+  provider_id int(11)
+  Indexes {
+    (access_token_id) [pk]
+  }
+}
+
+Table redcap_rewards_actions {
+  action_id int(11)
+  order_id int(11)
+  project_id int(11)
+  arm_number int(11)
+  record_id int(11)
+  stage varchar(255)
+  event varchar(255)
+  status varchar(255)
+  comment text
+  details text
+  performed_by int(11)
+  performed_at datetime
+  Indexes {
+    (action_id) [pk]
+  }
+}
+
+Table redcap_rewards_emails {
+  email_id int(11)
+  sendable_type varchar(255)
+  sendable_id int(11)
+  email_subject varchar(255)
+  email_content text
+  sender_email varchar(255)
+  recipient_email varchar(255)
+  sent_at datetime
+  sent_by int(11)
+  Indexes {
+    (email_id) [pk]
+  }
+}
+
+Table redcap_rewards_logs {
+  log_id int(11)
+  table_name varchar(255)
+  action varchar(255)
+  payload text
+  username varchar(255)
+  project_id int(11)
+  created_at datetime
+  Indexes {
+    (log_id) [pk]
+  }
+}
+
+Table redcap_rewards_orders {
+  order_id int(11)
+  reward_option_id int(11)
+  project_id int(11)
+  arm_number int(11)
+  record_id int(11)
+  internal_reference varchar(255)
+  reference_order varchar(255)
+  eligibility_logic text
+  reward_id varchar(255)
+  reward_name varchar(255)
+  reward_value decimal(10,2)
+  redeem_link text
+  status varchar(255)
+  scheduled_action varchar(255)
+  uuid varchar(36)
+  created_by int(11)
+  created_at datetime
+  Indexes {
+    (order_id) [pk]
+    (uuid) [unique, name: "idx_uuid_unique"]
+  }
+}
+
+Table redcap_rewards_permissions {
+  id int(11)
+  name varchar(191)
+  Indexes {
+    (id) [pk]
+    (name) [unique, name: "name"]
+  }
+}
+
+Table redcap_rewards_project_providers {
+  project_id int(11)
+  provider_id int(11)
+  Indexes {
+    (project_id,provider_id) [unique, name: "unique_project_provider"]
+  }
+}
+
+Table redcap_rewards_project_settings {
+  project_setting_id int(11)
+  project_id int(11)
+  setting_key varchar(255)
+  setting_value text
+  Indexes {
+    (project_setting_id) [pk]
+  }
+}
+
+Table redcap_rewards_providers {
+  provider_id int(11)
+  provider_name varchar(255)
+  is_default tinyint(1)
+  Indexes {
+    (provider_id) [pk]
+  }
+}
+
+Table redcap_rewards_reward_option {
+  reward_option_id int(11)
+  project_id int(11)
+  provider_product_id varchar(255)
+  description text
+  value_amount decimal(10,2)
+  eligibility_logic text
+  deleted_at timestamp
+  Indexes {
+    (reward_option_id) [pk]
+  }
+}
+
+Table redcap_rewards_settings {
+  setting_id int(11)
+  provider_id int(11)
+  setting_key varchar(255)
+  setting_value varchar(255)
+  Indexes {
+    (setting_id) [pk]
+  }
+}
+
+Table redcap_rewards_user_permissions {
+  user_id int(11)
+  permission_id int(11)
+  project_id int(11)
+  Indexes {
+    (user_id,permission_id,project_id) [pk]
+  }
+}
+
+Table redcap_sendit_docs {
+  document_id int(11)
+  doc_name varchar(255)
+  doc_orig_name varchar(255)
+  doc_type varchar(255)
+  doc_size int(11)
+  send_confirmation int(1)
+  expire_date datetime
+  username varchar(255)
+  location int(1)
+  docs_id int(11)
+  date_added datetime
+  date_deleted datetime
+  Indexes {
+    (document_id) [pk]
+  }
+}
+
+Table redcap_sendit_recipients {
+  recipient_id int(11)
+  email_address varchar(255)
+  sent_confirmation int(1)
+  download_date datetime
+  download_count int(11)
+  document_id int(11)
+  guid varchar(100)
+  pwd varchar(32)
+  Indexes {
+    (recipient_id) [pk]
+  }
+}
+
+Table redcap_sessions {
+  session_id varchar(32)
+  session_data longtext
+  session_expiration timestamp
+  Indexes {
+    (session_id) [pk]
+  }
+}
+
+Table redcap_surveys {
+  survey_id int(10)
+  project_id int(10)
+  form_name varchar(100)
+  title text
+  instructions text
+  offline_instructions text
+  acknowledgement text
+  stop_action_acknowledgement text
+  stop_action_delete_response tinyint(1)
+  question_by_section int(1)
+  display_page_number int(1)
+  question_auto_numbering int(1)
+  survey_enabled int(1)
+  save_and_return int(1)
+  save_and_return_code_bypass tinyint(1)
+  logo int(10)
+  hide_title int(1)
+  view_results int(1)
+  min_responses_view_results int(5)
+  check_diversity_view_results int(1)
+  end_survey_redirect_url text
+  survey_expiration varchar(50)
+  promis_skip_question int(1)
+  survey_auth_enabled_single int(1)
+  edit_completed_response int(1)
+  hide_back_button tinyint(1)
+  show_required_field_text tinyint(1)
+  confirmation_email_subject text
+  confirmation_email_content text
+  confirmation_email_from varchar(255)
+  confirmation_email_from_display varchar(150)
+  confirmation_email_attach_pdf tinyint(1)
+  confirmation_email_attachment int(10)
+  text_to_speech int(1)
+  text_to_speech_language varchar(50)
+  end_survey_redirect_next_survey tinyint(1)
+  end_survey_redirect_next_survey_logic text
+  theme int(10)
+  text_size tinyint(2)
+  font_family tinyint(2)
+  custom_css text
+  theme_text_buttons varchar(6)
+  theme_bg_page varchar(6)
+  theme_text_title varchar(6)
+  theme_bg_title varchar(6)
+  theme_text_sectionheader varchar(6)
+  theme_bg_sectionheader varchar(6)
+  theme_text_question varchar(6)
+  theme_bg_question varchar(6)
+  enhanced_choices smallint(1)
+  repeat_survey_enabled tinyint(1)
+  repeat_survey_btn_text varchar(255)
+  repeat_survey_btn_location enum('BEFORE_SUBMIT','AFTER_SUBMIT','HIDDEN')
+  response_limit int(7)
+  response_limit_include_partials tinyint(1)
+  response_limit_custom_text text
+  survey_time_limit_days smallint(3)
+  survey_time_limit_hours tinyint(2)
+  survey_time_limit_minutes tinyint(2)
+  email_participant_field varchar(255)
+  end_of_survey_pdf_download tinyint(4)
+  pdf_save_to_field varchar(100)
+  pdf_save_to_event_id int(10)
+  pdf_save_translated tinyint(1)
+  pdf_auto_archive tinyint(1)
+  pdf_econsent_version varchar(64)
+  pdf_econsent_type varchar(64)
+  pdf_econsent_firstname_field varchar(100)
+  pdf_econsent_firstname_event_id int(11)
+  pdf_econsent_lastname_field varchar(100)
+  pdf_econsent_lastname_event_id int(11)
+  pdf_econsent_dob_field varchar(100)
+  pdf_econsent_dob_event_id int(11)
+  pdf_econsent_allow_edit tinyint(1)
+  pdf_econsent_signature_field1 varchar(100)
+  pdf_econsent_signature_field2 varchar(100)
+  pdf_econsent_signature_field3 varchar(100)
+  pdf_econsent_signature_field4 varchar(100)
+  pdf_econsent_signature_field5 varchar(100)
+  survey_width_percent int(3)
+  survey_show_font_resize tinyint(1)
+  survey_btn_text_prev_page text
+  survey_btn_text_next_page text
+  survey_btn_text_submit text
+  survey_btn_hide_submit tinyint(1)
+  survey_btn_hide_submit_logic text
+  Indexes {
+    (survey_id) [pk]
+    (logo) [unique, name: "logo"]
+    (project_id,form_name) [unique, name: "project_form"]
+  }
+}
+
+Table redcap_surveys_emails {
+  email_id int(10)
+  survey_id int(10)
+  email_subject text
+  email_content text
+  email_sender int(10)
+  email_sender_display varchar(150)
+  email_account enum('1','2','3')
+  email_static varchar(255)
+  email_sent datetime
+  delivery_type enum('PARTICIPANT_PREF','EMAIL','VOICE_INITIATE','SMS_INITIATE','SMS_INVITE_MAKE_CALL','SMS_INVITE_RECEIVE_CALL','SMS_INVITE_WEB')
+  append_survey_link tinyint(1)
+  lang_id varchar(50)
+  Indexes {
+    (email_id) [pk]
+  }
+}
+
+Table redcap_surveys_emails_recipients {
+  email_recip_id int(10)
+  email_id int(10)
+  participant_id int(10)
+  static_email varchar(255)
+  static_phone varchar(50)
+  delivery_type enum('EMAIL','VOICE_INITIATE','SMS_INITIATE','SMS_INVITE_MAKE_CALL','SMS_INVITE_RECEIVE_CALL','SMS_INVITE_WEB')
+  Indexes {
+    (email_recip_id) [pk]
+  }
+}
+
+Table redcap_surveys_emails_send_rate {
+  esr_id int(10)
+  sent_begin_time datetime
+  emails_per_batch int(10)
+  emails_per_minute int(6)
+  Indexes {
+    (esr_id) [pk]
+  }
+}
+
+Table redcap_surveys_erase_twilio_log {
+  tl_id int(10)
+  project_id int(10)
+  ts datetime
+  sid varchar(191)
+  sid_hash varchar(50)
+  Indexes {
+    (tl_id) [pk]
+    (sid) [unique, name: "sid"]
+    (sid_hash) [unique, name: "sid_hash"]
+  }
+}
+
+Table redcap_surveys_login {
+  ts datetime
+  response_id int(10)
+  login_success tinyint(1)
+}
+
+Table redcap_surveys_participants {
+  participant_id int(10)
+  survey_id int(10)
+  event_id int(10)
+  hash varchar(32)
+  legacy_hash varchar(32)
+  access_code varchar(9)
+  access_code_numeral varchar(10)
+  participant_email varchar(255)
+  participant_identifier varchar(255)
+  participant_phone varchar(50)
+  delivery_preference enum('EMAIL','VOICE_INITIATE','SMS_INITIATE','SMS_INVITE_MAKE_CALL','SMS_INVITE_RECEIVE_CALL','SMS_INVITE_WEB')
+  link_expiration datetime
+  link_expiration_override tinyint(1)
+  Indexes {
+    (participant_id) [pk]
+    (access_code) [unique, name: "access_code"]
+    (access_code_numeral) [unique, name: "access_code_numeral"]
+    (hash) [unique, name: "hash"]
+    (legacy_hash) [unique, name: "legacy_hash"]
+  }
+}
+
+Table redcap_surveys_pdf_archive {
+  doc_id int(10)
+  consent_id int(10)
+  consent_form_id int(10)
+  contains_completed_consent tinyint(1)
+  snapshot_id int(10)
+  record varchar(100)
+  event_id int(10)
+  survey_id int(10)
+  instance smallint(4)
+  identifier varchar(255)
+  version varchar(64)
+  type varchar(64)
+  ip varchar(100)
+  Indexes {
+    (doc_id) [unique, name: "doc_id"]
+  }
+}
+
+Table redcap_surveys_phone_codes {
+  pc_id int(10)
+  phone_number varchar(50)
+  twilio_number varchar(50)
+  access_code varchar(12)
+  project_id int(10)
+  session_id varchar(32)
+  Indexes {
+    (pc_id) [pk]
+    (phone_number,twilio_number,access_code,project_id) [unique, name: "phone_access_project"]
+  }
+}
+
+Table redcap_surveys_queue {
+  sq_id int(10)
+  survey_id int(10)
+  event_id int(10)
+  active int(1)
+  auto_start int(1)
+  condition_surveycomplete_survey_id int(10)
+  condition_surveycomplete_event_id int(10)
+  condition_andor enum('AND','OR')
+  condition_logic text
+  Indexes {
+    (sq_id) [pk]
+    (survey_id,event_id) [unique, name: "survey_event"]
+  }
+}
+
+Table redcap_surveys_queue_hashes {
+  project_id int(10)
+  record varchar(100)
+  hash varchar(10)
+  Indexes {
+    (project_id,record) [pk]
+    (hash) [unique, name: "hash"]
+  }
+}
+
+Table redcap_surveys_response {
+  response_id int(11)
+  participant_id int(10)
+  record varchar(100)
+  instance smallint(4)
+  start_time datetime
+  first_submit_time datetime
+  completion_time datetime
+  return_code varchar(8)
+  results_code varchar(8)
+  Indexes {
+    (response_id) [pk]
+    (participant_id,record,instance) [unique, name: "participant_record"]
+  }
+}
+
+Table redcap_surveys_scheduler {
+  ss_id int(10)
+  survey_id int(10)
+  event_id int(10)
+  instance enum('FIRST','AFTER_FIRST')
+  num_recurrence float
+  units_recurrence enum('DAYS','HOURS','MINUTES')
+  max_recurrence int(5)
+  active int(1)
+  email_subject text
+  email_content text
+  email_sender varchar(255)
+  email_sender_display varchar(150)
+  condition_surveycomplete_survey_id int(10)
+  condition_surveycomplete_event_id int(10)
+  condition_surveycomplete_instance enum('FIRST','PREVIOUS')
+  condition_andor enum('AND','OR')
+  condition_logic text
+  condition_send_time_option enum('IMMEDIATELY','TIME_LAG','NEXT_OCCURRENCE','EXACT_TIME')
+  condition_send_time_lag_days int(4)
+  condition_send_time_lag_hours int(2)
+  condition_send_time_lag_minutes int(2)
+  condition_send_time_lag_field varchar(255)
+  condition_send_time_lag_field_after enum('before','after')
+  condition_send_next_day_type enum('DAY','WEEKDAY','WEEKENDDAY','SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY')
+  condition_send_next_time time
+  condition_send_time_exact datetime
+  delivery_type enum('EMAIL','VOICE_INITIATE','SMS_INITIATE','SMS_INVITE_MAKE_CALL','SMS_INVITE_RECEIVE_CALL','PARTICIPANT_PREF','SMS_INVITE_WEB')
+  reminder_type enum('TIME_LAG','NEXT_OCCURRENCE','EXACT_TIME')
+  reminder_timelag_days int(3)
+  reminder_timelag_hours int(2)
+  reminder_timelag_minutes int(2)
+  reminder_nextday_type enum('DAY','WEEKDAY','WEEKENDDAY','SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY')
+  reminder_nexttime time
+  reminder_exact_time datetime
+  reminder_num int(3)
+  reeval_before_send int(1)
+  Indexes {
+    (ss_id) [pk]
+    (survey_id,event_id) [unique, name: "survey_event"]
+  }
+}
+
+Table redcap_surveys_scheduler_queue {
+  ssq_id int(10)
+  ss_id int(10)
+  email_recip_id int(10)
+  reminder_num int(3)
+  record varchar(100)
+  instance smallint(4)
+  scheduled_time_to_send datetime
+  status enum('QUEUED','SENDING','SENT','DID
+  time_sent datetime
+  reason_not_sent enum('EMAIL
+  Indexes {
+    (ssq_id) [pk]
+    (email_recip_id,record,reminder_num,instance) [unique, name: "email_recip_id_record"]
+    (ss_id,record,reminder_num,instance) [unique, name: "ss_id_record"]
+  }
+}
+
+Table redcap_surveys_scheduler_recurrence {
+  ssr_id int(10)
+  ss_id int(10)
+  creation_date datetime
+  record varchar(100)
+  event_id int(10)
+  instrument varchar(100)
+  times_sent smallint(4)
+  last_sent datetime
+  status enum('IDLE','QUEUED','SENDING')
+  first_send_time datetime
+  next_send_time datetime
+  Indexes {
+    (ssr_id) [pk]
+    (ss_id,record,event_id,instrument) [unique, name: "ss_id_record_event_instrument"]
+  }
+}
+
+Table redcap_surveys_short_codes {
+  ts datetime
+  participant_id int(10)
+  code varchar(6)
+  Indexes {
+    (code) [unique, name: "code"]
+  }
+}
+
+Table redcap_surveys_themes {
+  theme_id int(10)
+  theme_name varchar(50)
+  ui_id int(10)
+  theme_text_buttons varchar(6)
+  theme_bg_page varchar(6)
+  theme_text_title varchar(6)
+  theme_bg_title varchar(6)
+  theme_text_sectionheader varchar(6)
+  theme_bg_sectionheader varchar(6)
+  theme_text_question varchar(6)
+  theme_bg_question varchar(6)
+  Indexes {
+    (theme_id) [pk]
+  }
+}
+
+Table redcap_todo_list {
+  request_id int(11)
+  request_from int(11)
+  request_to varchar(255)
+  todo_type varchar(50)
+  todo_type_id int(11)
+  action_url text
+  status varchar(50)
+  request_time datetime
+  project_id int(10)
+  request_completion_time datetime
+  request_completion_userid int(11)
+  comment text
+  Indexes {
+    (request_id) [pk]
+    (project_id,todo_type,todo_type_id) [unique, name: "project_id_todo_type_id"]
+  }
+}
+
+Table redcap_twilio_credentials_temp {
+  tc_id int(10)
+  request_id int(10)
+  project_id int(10)
+  twilio_account_sid varchar(64)
+  twilio_auth_token varchar(64)
+  twilio_from_number bigint(16)
+  twilio_alphanum_sender_id varchar(50)
+  mosio_api_key varchar(100)
+  Indexes {
+    (tc_id) [pk]
+  }
+}
+
+Table redcap_twilio_error_log {
+  error_id int(10)
+  ssq_id int(10)
+  alert_sent_log_id int(10)
+  error_message text
+  Indexes {
+    (error_id) [pk]
+  }
+}
+
+Table redcap_two_factor_response {
+  tf_id int(10)
+  user_id int(10)
+  time_sent datetime
+  phone_number varchar(50)
+  verified tinyint(1)
+  Indexes {
+    (tf_id) [pk]
+  }
+}
+
+Table redcap_user_allowlist {
+  username varchar(191)
+  Indexes {
+    (username) [pk]
+  }
+}
+
+Table redcap_user_information {
+  ui_id int(10)
+  username varchar(191)
+  user_email varchar(255)
+  user_email2 varchar(255)
+  user_email3 varchar(255)
+  user_phone varchar(50)
+  user_phone_sms varchar(50)
+  user_firstname varchar(255)
+  user_lastname varchar(255)
+  user_inst_id varchar(255)
+  super_user tinyint(1)
+  account_manager tinyint(1)
+  access_system_config tinyint(1)
+  access_system_upgrade tinyint(1)
+  access_external_module_install tinyint(1)
+  admin_rights tinyint(1)
+  access_admin_dashboards tinyint(1)
+  user_creation datetime
+  user_firstvisit datetime
+  user_firstactivity datetime
+  user_lastactivity datetime
+  user_lastlogin datetime
+  user_suspended_time datetime
+  user_expiration datetime
+  user_access_dashboard_view datetime
+  user_access_dashboard_email_queued enum('QUEUED','SENDING')
+  user_sponsor varchar(255)
+  user_comments text
+  allow_create_db int(1)
+  email_verify_code varchar(20)
+  email2_verify_code varchar(20)
+  email3_verify_code varchar(20)
+  datetime_format enum('M-D-Y_24','M-D-Y_12','M/D/Y_24','M/D/Y_12','M.D.Y_24','M.D.Y_12','D-M-Y_24','D-M-Y_12','D/M/Y_24','D/M/Y_12','D.M.Y_24','D.M.Y_12','Y-M-D_24','Y-M-D_12','Y/M/D_24','Y/M/D_12','Y.M.D_24','Y.M.D_12')
+  number_format_decimal enum('.',',')
+  number_format_thousands_sep enum(',','.','','SPACE','''')
+  csv_delimiter enum(',',';','TAB','SPACE','|','^')
+  two_factor_auth_secret varchar(32)
+  two_factor_auth_enrolled tinyint(1)
+  display_on_email_users int(1)
+  two_factor_auth_twilio_prompt_phone tinyint(1)
+  two_factor_auth_code_expiration int(3)
+  api_token varchar(64)
+  messaging_email_preference enum('NONE','2_HOURS','4_HOURS','6_HOURS','8_HOURS','12_HOURS','DAILY')
+  messaging_email_urgent_all tinyint(1)
+  messaging_email_ts datetime
+  messaging_email_general_system tinyint(1)
+  messaging_email_queue_time datetime
+  ui_state mediumtext
+  api_token_auto_request tinyint(1)
+  fhir_data_mart_create_project tinyint(1)
+  Indexes {
+    (ui_id) [pk]
+    (api_token) [unique, name: "api_token"]
+    (email2_verify_code) [unique, name: "email2_verify_code"]
+    (email3_verify_code) [unique, name: "email3_verify_code"]
+    (email_verify_code) [unique, name: "email_verify_code"]
+    (username) [unique, name: "username"]
+  }
+}
+
+Table redcap_user_rights {
+  project_id int(10)
+  username varchar(191)
+  expiration date
+  role_id int(10)
+  group_id int(10)
+  lock_record int(1)
+  lock_record_multiform int(1)
+  lock_record_customize int(1)
+  data_export_tool tinyint(1)
+  data_export_instruments text
+  data_import_tool int(1)
+  data_comparison_tool int(1)
+  data_logging int(1)
+  email_logging int(1)
+  file_repository int(1)
+  double_data int(1)
+  user_rights int(1)
+  data_access_groups int(1)
+  graphical int(1)
+  reports int(1)
+  design int(1)
+  alerts int(1)
+  calendar int(1)
+  data_entry text
+  api_token varchar(32)
+  api_export int(1)
+  api_import int(1)
+  api_modules int(1)
+  mobile_app int(1)
+  mobile_app_download_data int(1)
+  record_create int(1)
+  record_rename int(1)
+  record_delete int(1)
+  dts int(1)
+  participants int(1)
+  data_quality_design int(1)
+  data_quality_execute int(1)
+  data_quality_resolution int(1)
+  random_setup int(1)
+  random_dashboard int(1)
+  random_perform int(1)
+  realtime_webservice_mapping int(1)
+  realtime_webservice_adjudicate int(1)
+  external_module_config text
+  mycap_participants int(1)
+  Indexes {
+    (project_id,username) [pk]
+    (api_token) [unique, name: "api_token"]
+  }
+}
+
+Table redcap_user_roles {
+  role_id int(10)
+  project_id int(10)
+  role_name varchar(255)
+  unique_role_name varchar(50)
+  lock_record int(1)
+  lock_record_multiform int(1)
+  lock_record_customize int(1)
+  data_export_tool tinyint(1)
+  data_export_instruments text
+  data_import_tool int(1)
+  data_comparison_tool int(1)
+  data_logging int(1)
+  email_logging int(1)
+  file_repository int(1)
+  double_data int(1)
+  user_rights int(1)
+  data_access_groups int(1)
+  graphical int(1)
+  reports int(1)
+  design int(1)
+  alerts int(1)
+  calendar int(1)
+  data_entry text
+  api_export int(1)
+  api_import int(1)
+  api_modules int(1)
+  mobile_app int(1)
+  mobile_app_download_data int(1)
+  record_create int(1)
+  record_rename int(1)
+  record_delete int(1)
+  dts int(1)
+  participants int(1)
+  data_quality_design int(1)
+  data_quality_execute int(1)
+  data_quality_resolution int(1)
+  random_setup int(1)
+  random_dashboard int(1)
+  random_perform int(1)
+  realtime_webservice_mapping int(1)
+  realtime_webservice_adjudicate int(1)
+  external_module_config text
+  mycap_participants int(1)
+  Indexes {
+    (role_id) [pk]
+    (project_id,unique_role_name) [unique, name: "project_id_unique_role_name"]
+  }
+}
+
+Table redcap_validation_types {
+  validation_name varchar(191)
+  validation_label varchar(255)
+  regex_js text
+  regex_php text
+  data_type enum('date','datetime','datetime_seconds','email','integer','mrn','number','number_comma_decimal','phone','postal_code','ssn','text','time','char')
+  legacy_value varchar(255)
+  visible int(1)
+  Indexes {
+    (validation_name) [unique, name: "validation_name"]
+  }
+}
+
+Table redcap_web_service_cache {
+  cache_id int(10)
+  project_id int(10)
+  service varchar(50)
+  category varchar(150)
+  value varchar(100)
+  label varchar(255)
+  Indexes {
+    (cache_id) [pk]
+    (project_id,service,category,value) [unique, name: "project_service_cat_value"]
+  }
+}
+
+Ref: redcap_actions.survey_id > redcap_surveys.survey_id
+Ref: redcap_ai_log.user_id > redcap_user_information.ui_id
+Ref: redcap_alerts.project_id > redcap_projects.project_id
+Ref: redcap_alerts_recurrence.event_id > redcap_events_metadata.event_id
+Ref: redcap_alerts_sent.event_id > redcap_events_metadata.event_id
+Ref: redcap_alerts_sent_log.alert_sent_id > redcap_alerts_sent.alert_sent_id
+Ref: redcap_auth.password_question > redcap_auth_questions.qid
+Ref: redcap_cache.project_id > redcap_projects.project_id
+Ref: redcap_cde_field_mapping.project_id > redcap_projects.project_id
+Ref: redcap_crons.external_module_id > redcap_external_modules.external_module_id
+Ref: redcap_crons_datediff.project_id > redcap_projects.project_id
+Ref: redcap_crons_history.cron_id > redcap_crons.cron_id
+Ref: redcap_custom_queries_folders_items.qid > redcap_custom_queries.qid
+Ref: redcap_data_access_groups.project_id > redcap_projects.project_id
+Ref: redcap_data_access_groups_users.project_id > redcap_projects.project_id
+Ref: redcap_data_dictionaries.ui_id > redcap_user_information.ui_id
+Ref: redcap_data_import.user_id > redcap_user_information.ui_id
+Ref: redcap_data_import_rows.import_id > redcap_data_import.import_id
+Ref: redcap_data_quality_resolutions.user_id > redcap_user_information.ui_id
+Ref: redcap_data_quality_rules.project_id > redcap_projects.project_id
+Ref: redcap_data_quality_status.rule_id > redcap_data_quality_rules.rule_id
+Ref: redcap_ddp_log_view.user_id > redcap_user_information.ui_id
+Ref: redcap_ddp_log_view_data.ml_id > redcap_ddp_log_view.ml_id
+Ref: redcap_ddp_mapping.project_id > redcap_projects.project_id
+Ref: redcap_ddp_preview_fields.project_id > redcap_projects.project_id
+Ref: redcap_ddp_records.project_id > redcap_projects.project_id
+Ref: redcap_ddp_records_data.mr_id > redcap_ddp_records.mr_id
+Ref: redcap_descriptive_popups.project_id > redcap_projects.project_id
+Ref: redcap_docs.project_id > redcap_projects.project_id
+Ref: redcap_docs_attachments.docs_id > redcap_docs.docs_id
+Ref: redcap_docs_folders.role_id > redcap_user_roles.role_id
+Ref: redcap_docs_folders_files.folder_id > redcap_docs_folders.folder_id
+Ref: redcap_docs_share.docs_id > redcap_docs.docs_id
+Ref: redcap_docs_to_edocs.docs_id > redcap_docs.docs_id
+Ref: redcap_econsent.survey_id > redcap_surveys.survey_id
+Ref: redcap_econsent_forms.uploader > redcap_user_information.ui_id
+Ref: redcap_edocs_data_mapping.project_id > redcap_projects.project_id
+Ref: redcap_edocs_metadata.project_id > redcap_projects.project_id
+Ref: redcap_ehr_access_tokens.token_owner > redcap_user_information.ui_id
+Ref: redcap_ehr_datamart_revisions.user_id > redcap_user_information.ui_id
+Ref: redcap_ehr_fhir_logs.user_id > redcap_user_information.ui_id
+Ref: redcap_ehr_import_counts.project_id > redcap_projects.project_id
+Ref: redcap_ehr_resource_import_details.ehr_import_count_id > redcap_ehr_resource_imports.id
+Ref: redcap_ehr_resource_imports.project_id > redcap_projects.project_id
+Ref: redcap_ehr_token_rules.user_id > redcap_user_information.ui_id
+Ref: redcap_ehr_user_map.ehr_id > redcap_ehr_settings.ehr_id
+Ref: redcap_ehr_user_projects.redcap_userid > redcap_user_information.ui_id
+Ref: redcap_email_users_messages.sent_by > redcap_user_information.ui_id
+Ref: redcap_error_log.log_view_id > redcap_log_view.log_view_id
+Ref: redcap_esignatures.project_id > redcap_projects.project_id
+Ref: redcap_events_arms.project_id > redcap_projects.project_id
+Ref: redcap_events_calendar.project_id > redcap_projects.project_id
+Ref: redcap_events_calendar_feed.userid > redcap_user_information.ui_id
+Ref: redcap_events_forms.event_id > redcap_events_metadata.event_id
+Ref: redcap_events_metadata.arm_id > redcap_events_arms.arm_id
+Ref: redcap_events_repeat.event_id > redcap_events_metadata.event_id
+Ref: redcap_external_links.project_id > redcap_projects.project_id
+Ref: redcap_external_links_dags.group_id > redcap_data_access_groups.group_id
+Ref: redcap_external_links_exclude_projects.project_id > redcap_projects.project_id
+Ref: redcap_external_links_users.ext_id > redcap_external_links.ext_id
+Ref: redcap_external_module_settings.project_id > redcap_projects.project_id
+Ref: redcap_external_modules_log_parameters.log_id > redcap_external_modules_log.log_id
+Ref: redcap_folders.ui_id > redcap_user_information.ui_id
+Ref: redcap_folders_projects.ui_id > redcap_user_information.ui_id
+Ref: redcap_form_display_logic_conditions.project_id > redcap_projects.project_id
+Ref: redcap_form_display_logic_targets.event_id > redcap_events_metadata.event_id
+Ref: redcap_forms.project_id > redcap_projects.project_id
+Ref: redcap_forms_temp.project_id > redcap_projects.project_id
+Ref: redcap_instrument_zip.iza_id > redcap_instrument_zip_authors.iza_id
+Ref: redcap_library_map.project_id > redcap_projects.project_id
+Ref: redcap_locking_data.project_id > redcap_projects.project_id
+Ref: redcap_locking_labels.project_id > redcap_projects.project_id
+Ref: redcap_locking_records.project_id > redcap_projects.project_id
+Ref: redcap_locking_records_pdf_archive.project_id > redcap_projects.project_id
+Ref: redcap_log_view_requests.ui_id > redcap_user_information.ui_id
+Ref: redcap_messages.thread_id > redcap_messages_threads.thread_id
+Ref: redcap_messages_recipients.thread_id > redcap_messages_threads.thread_id
+Ref: redcap_messages_status.recipient_user_id > redcap_user_information.ui_id
+Ref: redcap_messages_threads.project_id > redcap_projects.project_id
+Ref: redcap_metadata.project_id > redcap_projects.project_id
+Ref: redcap_metadata_archive.project_id > redcap_projects.project_id
+Ref: redcap_metadata_prod_revisions.ui_id_requester > redcap_user_information.ui_id
+Ref: redcap_metadata_temp.project_id > redcap_projects.project_id
+Ref: redcap_mobile_app_devices.project_id > redcap_projects.project_id
+Ref: redcap_mobile_app_files.user_id > redcap_user_information.ui_id
+Ref: redcap_mobile_app_log.ui_id > redcap_user_information.ui_id
+Ref: redcap_multilanguage_config.project_id > redcap_projects.project_id
+Ref: redcap_multilanguage_config_temp.project_id > redcap_projects.project_id
+Ref: redcap_multilanguage_metadata.project_id > redcap_projects.project_id
+Ref: redcap_multilanguage_metadata_temp.project_id > redcap_projects.project_id
+Ref: redcap_multilanguage_snapshots.project_id > redcap_projects.project_id
+Ref: redcap_multilanguage_ui.project_id > redcap_projects.project_id
+Ref: redcap_multilanguage_ui_temp.project_id > redcap_projects.project_id
+Ref: redcap_mycap_aboutpages.project_id > redcap_projects.project_id
+Ref: redcap_mycap_contacts.project_id > redcap_projects.project_id
+Ref: redcap_mycap_links.project_id > redcap_projects.project_id
+Ref: redcap_mycap_message_notifications.project_id > redcap_projects.project_id
+Ref: redcap_mycap_messages.project_id > redcap_projects.project_id
+Ref: redcap_mycap_participants.project_id > redcap_projects.project_id
+Ref: redcap_mycap_projectfiles.project_code > redcap_mycap_projects.code
+Ref: redcap_mycap_projects.project_id > redcap_projects.project_id
+Ref: redcap_mycap_syncissuefiles.uuid > redcap_mycap_syncissues.uuid
+Ref: redcap_mycap_syncissues.event_id > redcap_events_metadata.event_id
+Ref: redcap_mycap_tasks.project_id > redcap_projects.project_id
+Ref: redcap_mycap_tasks_schedules.task_id > redcap_mycap_tasks.task_id
+Ref: redcap_mycap_themes.project_id > redcap_projects.project_id
+Ref: redcap_new_record_cache.project_id > redcap_projects.project_id
+Ref: redcap_outgoing_email_sms_identifiers.ssq_id > redcap_surveys_scheduler_queue.ssq_id
+Ref: redcap_outgoing_email_sms_log.project_id > redcap_projects.project_id
+Ref: redcap_pdf_image_cache.pdf_doc_id > redcap_edocs_metadata.doc_id
+Ref: redcap_pdf_snapshots.trigger_surveycomplete_survey_id > redcap_surveys.survey_id
+Ref: redcap_pdf_snapshots_triggered.snapshot_id > redcap_pdf_snapshots.snapshot_id
+Ref: redcap_project_checklist.project_id > redcap_projects.project_id
+Ref: redcap_project_dashboards.project_id > redcap_projects.project_id
+Ref: redcap_project_dashboards_access_dags.group_id > redcap_data_access_groups.group_id
+Ref: redcap_project_dashboards_access_roles.role_id > redcap_user_roles.role_id
+Ref: redcap_project_dashboards_access_users.dash_id > redcap_project_dashboards.dash_id
+Ref: redcap_project_dashboards_folders.project_id > redcap_projects.project_id
+Ref: redcap_project_dashboards_folders_items.folder_id > redcap_project_dashboards_folders.folder_id
+Ref: redcap_projects.template_id > redcap_projects.project_id
+Ref: redcap_projects_templates.project_id > redcap_projects.project_id
+Ref: redcap_projects_user_hidden.ui_id > redcap_user_information.ui_id
+Ref: redcap_pub_articles.pubsrc_id > redcap_pub_sources.pubsrc_id
+Ref: redcap_pub_authors.article_id > redcap_pub_articles.article_id
+Ref: redcap_pub_matches.project_id > redcap_projects.project_id
+Ref: redcap_pub_mesh_terms.article_id > redcap_pub_articles.article_id
+Ref: redcap_randomization.trigger_event_id > redcap_events_metadata.event_id
+Ref: redcap_randomization_allocation.rid > redcap_randomization.rid
+Ref: redcap_record_background_delete.user_id > redcap_user_information.ui_id
+Ref: redcap_record_background_delete_items.delete_id > redcap_record_background_delete.delete_id
+Ref: redcap_record_counts.project_id > redcap_projects.project_id
+Ref: redcap_record_dashboards.sort_event_id > redcap_events_metadata.event_id
+Ref: redcap_record_list.project_id > redcap_projects.project_id
+Ref: redcap_reports.project_id > redcap_projects.project_id
+Ref: redcap_reports_access_dags.report_id > redcap_reports.report_id
+Ref: redcap_reports_access_roles.role_id > redcap_user_roles.role_id
+Ref: redcap_reports_access_users.report_id > redcap_reports.report_id
+Ref: redcap_reports_ai_prompts.report_id > redcap_reports.report_id
+Ref: redcap_reports_edit_access_dags.report_id > redcap_reports.report_id
+Ref: redcap_reports_edit_access_roles.role_id > redcap_user_roles.role_id
+Ref: redcap_reports_edit_access_users.report_id > redcap_reports.report_id
+Ref: redcap_reports_fields.report_id > redcap_reports.report_id
+Ref: redcap_reports_filter_dags.report_id > redcap_reports.report_id
+Ref: redcap_reports_filter_events.report_id > redcap_reports.report_id
+Ref: redcap_reports_folders.project_id > redcap_projects.project_id
+Ref: redcap_reports_folders_items.report_id > redcap_reports.report_id
+Ref: redcap_rewards_access_token.provider_id > redcap_rewards_providers.provider_id
+Ref: redcap_rewards_actions.project_id > redcap_projects.project_id
+Ref: redcap_rewards_emails.sent_by > redcap_user_information.ui_id
+Ref: redcap_rewards_logs.project_id > redcap_projects.project_id
+Ref: redcap_rewards_orders.reward_option_id > redcap_rewards_reward_option.reward_option_id
+Ref: redcap_rewards_project_providers.provider_id > redcap_rewards_providers.provider_id
+Ref: redcap_rewards_project_settings.project_id > redcap_projects.project_id
+Ref: redcap_rewards_reward_option.project_id > redcap_projects.project_id
+Ref: redcap_rewards_settings.provider_id > redcap_rewards_providers.provider_id
+Ref: redcap_rewards_user_permissions.user_id > redcap_user_information.ui_id
+Ref: redcap_sendit_recipients.document_id > redcap_sendit_docs.document_id
+Ref: redcap_surveys.theme > redcap_surveys_themes.theme_id
+Ref: redcap_surveys_emails.survey_id > redcap_surveys.survey_id
+Ref: redcap_surveys_emails_recipients.participant_id > redcap_surveys_participants.participant_id
+Ref: redcap_surveys_erase_twilio_log.project_id > redcap_projects.project_id
+Ref: redcap_surveys_login.response_id > redcap_surveys_response.response_id
+Ref: redcap_surveys_participants.survey_id > redcap_surveys.survey_id
+Ref: redcap_surveys_pdf_archive.survey_id > redcap_surveys.survey_id
+Ref: redcap_surveys_phone_codes.project_id > redcap_projects.project_id
+Ref: redcap_surveys_queue.survey_id > redcap_surveys.survey_id
+Ref: redcap_surveys_queue_hashes.project_id > redcap_projects.project_id
+Ref: redcap_surveys_response.participant_id > redcap_surveys_participants.participant_id
+Ref: redcap_surveys_scheduler.survey_id > redcap_surveys.survey_id
+Ref: redcap_surveys_scheduler_queue.ss_id > redcap_surveys_scheduler.ss_id
+Ref: redcap_surveys_scheduler_recurrence.ss_id > redcap_surveys_scheduler.ss_id
+Ref: redcap_surveys_short_codes.participant_id > redcap_surveys_participants.participant_id
+Ref: redcap_surveys_themes.ui_id > redcap_user_information.ui_id
+Ref: redcap_todo_list.request_from > redcap_user_information.ui_id
+Ref: redcap_twilio_credentials_temp.request_id > redcap_todo_list.request_id
+Ref: redcap_twilio_error_log.ssq_id > redcap_surveys_scheduler_queue.ssq_id
+Ref: redcap_two_factor_response.user_id > redcap_user_information.ui_id
+Ref: redcap_user_rights.role_id > redcap_user_roles.role_id
+Ref: redcap_user_roles.project_id > redcap_projects.project_id
+Ref: redcap_web_service_cache.project_id > redcap_projects.project_id

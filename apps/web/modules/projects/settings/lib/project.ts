@@ -1,0 +1,218 @@
+import "server-only";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
+import { prisma } from "@continium/database";
+import { PrismaErrorType } from "@continium/database/types/error";
+import { logger } from "@continium/logger";
+import { ZId, ZString } from "@continium/types/common";
+import { DatabaseError, InvalidInputError, ValidationError } from "@continium/types/errors";
+import { TProject, TProjectUpdateInput, ZProject, ZProjectUpdateInput } from "@continium/types/project";
+import { createEnvironment } from "@/lib/environment/service";
+import { validateInputs } from "@/lib/utils/validate";
+import { deleteFilesByEnvironmentId } from "@/modules/storage/service";
+
+const selectProject = {
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  name: true,
+  organizationId: true,
+  languages: true,
+  recontactDays: true,
+  linkSurveyBranding: true,
+  inAppSurveyBranding: true,
+  config: true,
+  placement: true,
+  clickOutsideClose: true,
+  overlay: true,
+  environments: true,
+  styling: true,
+  logo: true,
+  customHeadScripts: true,
+  kind: true,
+};
+
+const deleteClinicalProjectDependencies = async (
+  tx: Prisma.TransactionClient,
+  projectId: string
+): Promise<void> => {
+  await tx.$executeRaw`
+    DELETE FROM "value_revision"
+    WHERE "record_id" IN (
+      SELECT "id" FROM "record" WHERE "project_id" = ${projectId}
+    )
+  `;
+
+  await tx.recordValue.deleteMany({
+    where: {
+      projectId,
+    },
+  });
+
+  await tx.record.deleteMany({
+    where: {
+      projectId,
+    },
+  });
+
+  await tx.eventInstrument.deleteMany({
+    where: {
+      event: {
+        arm: {
+          study: {
+            projectId,
+          },
+        },
+      },
+    },
+  });
+
+  await tx.enrollment.deleteMany({
+    where: {
+      subject: {
+        study: {
+          projectId,
+        },
+      },
+    },
+  });
+};
+
+export const updateProject = async (
+  projectId: string,
+  inputProject: TProjectUpdateInput
+): Promise<TProject> => {
+  validateInputs([projectId, ZId], [inputProject, ZProjectUpdateInput]);
+  const { environments, ...data } = inputProject;
+  let updatedProject;
+  try {
+    updatedProject = await prisma.project.update({
+      where: {
+        id: projectId,
+      },
+      data: {
+        ...data,
+        environments: {
+          connect: environments?.map((environment) => ({ id: environment.id })) ?? [],
+        },
+      },
+      select: selectProject,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      throw new DatabaseError(error.message);
+    }
+    throw error;
+  }
+
+  try {
+    const project = ZProject.parse(updatedProject);
+
+    return project;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.error(error.issues, "Error updating project");
+    }
+    throw new ValidationError("Data validation of project failed");
+  }
+};
+
+export const createProject = async (
+  organizationId: string,
+  projectInput: Partial<TProjectUpdateInput>
+): Promise<TProject> => {
+  validateInputs([organizationId, ZString], [projectInput, ZProjectUpdateInput.partial()]);
+
+  if (!projectInput.name) {
+    throw new ValidationError("Project Name is required");
+  }
+
+  const { environments, teamIds, ...data } = projectInput;
+
+  try {
+    let project = await prisma.project.create({
+      data: {
+        config: {
+          channel: null,
+          industry: null,
+        },
+        ...data,
+        name: projectInput.name,
+        organizationId,
+        kind: "CLINICAL",
+      },
+      select: selectProject,
+    });
+
+    if (teamIds) {
+      await prisma.projectTeam.createMany({
+        data: teamIds.map((teamId) => ({
+          projectId: project.id,
+          teamId,
+        })),
+      });
+    }
+
+    const devEnvironment = await createEnvironment(project.id, {
+      type: "development",
+    });
+
+    const prodEnvironment = await createEnvironment(project.id, {
+      type: "production",
+    });
+
+    const updatedProject = await updateProject(project.id, {
+      environments: [devEnvironment, prodEnvironment],
+    });
+
+    return updatedProject;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === PrismaErrorType.UniqueConstraintViolation) {
+        throw new InvalidInputError("A workspace with this name already exists in your organization");
+      }
+      throw new DatabaseError(error.message);
+    }
+    throw error;
+  }
+};
+
+export const deleteProject = async (projectId: string): Promise<TProject> => {
+  try {
+    const project = await prisma.$transaction(async (tx) => {
+      await deleteClinicalProjectDependencies(tx, projectId);
+
+      return tx.project.delete({
+        where: {
+          id: projectId,
+        },
+        select: selectProject,
+      });
+    });
+
+    if (project) {
+      // delete all files from storage related to this project
+
+      const s3FilesPromises = project.environments.map(async (environment) => {
+        return deleteFilesByEnvironmentId(environment.id);
+      });
+
+      const s3FilesResult = await Promise.all(s3FilesPromises);
+
+      for (const result of s3FilesResult) {
+        if (!result.ok) {
+          // fail silently because we don't want to throw an error if the files are not deleted
+          logger.error(result.error, "Error deleting S3 files");
+        }
+      }
+    }
+
+    return project;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      throw new DatabaseError(error.message);
+    }
+
+    throw error;
+  }
+};

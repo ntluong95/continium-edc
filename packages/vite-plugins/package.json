@@ -1,0 +1,22 @@
+{
+  "name": "@continium/vite-plugins",
+  "license": "MIT",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "homepage": "https://continium.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/continium/continium"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "clean": "rimraf .turbo node_modules dist",
+    "lint": "eslint . --ext .ts,.js,.tsx,.jsx"
+  },
+  "devDependencies": {
+    "@continium/config-typescript": "workspace:*",
+    "@continium/eslint-config": "workspace:*",
+    "vite": "7.3.3"
+  }
+}

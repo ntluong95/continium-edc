@@ -1,0 +1,66 @@
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+const envMock = {
+  WEBAPP_URL: undefined as string | undefined,
+  VERCEL_URL: undefined as string | undefined,
+  PUBLIC_URL: undefined as string | undefined,
+};
+
+vi.mock("./env", () => ({
+  env: envMock,
+}));
+
+const loadGetPublicDomain = async () => {
+  vi.resetModules();
+  const { getPublicDomain } = await import("./getPublicUrl");
+  return getPublicDomain;
+};
+
+describe("getPublicDomain", () => {
+  beforeEach(() => {
+    envMock.WEBAPP_URL = undefined;
+    envMock.VERCEL_URL = undefined;
+    envMock.PUBLIC_URL = undefined;
+  });
+
+  test("returns trimmed WEBAPP_URL when configured", async () => {
+    envMock.WEBAPP_URL = " https://app.continium.com ";
+
+    const getPublicDomain = await loadGetPublicDomain();
+
+    expect(getPublicDomain()).toBe("https://app.continium.com");
+  });
+
+  test("falls back to VERCEL_URL when WEBAPP_URL is empty", async () => {
+    envMock.WEBAPP_URL = "   ";
+    envMock.VERCEL_URL = "preview.continium.com";
+
+    const getPublicDomain = await loadGetPublicDomain();
+
+    expect(getPublicDomain()).toBe("https://preview.continium.com");
+  });
+
+  test("falls back to localhost when WEBAPP_URL and VERCEL_URL are not set", async () => {
+    const getPublicDomain = await loadGetPublicDomain();
+
+    expect(getPublicDomain()).toBe("http://localhost:3000");
+  });
+
+  test("returns PUBLIC_URL when set", async () => {
+    envMock.WEBAPP_URL = "https://app.continium.com";
+    envMock.PUBLIC_URL = "https://surveys.continium.com";
+
+    const getPublicDomain = await loadGetPublicDomain();
+
+    expect(getPublicDomain()).toBe("https://surveys.continium.com");
+  });
+
+  test("falls back to WEBAPP_URL when PUBLIC_URL is empty", async () => {
+    envMock.WEBAPP_URL = "https://app.continium.com";
+    envMock.PUBLIC_URL = " ";
+
+    const getPublicDomain = await loadGetPublicDomain();
+
+    expect(getPublicDomain()).toBe("https://app.continium.com");
+  });
+});

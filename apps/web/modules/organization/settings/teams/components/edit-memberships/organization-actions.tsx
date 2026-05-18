@@ -1,0 +1,233 @@
+"use client";
+
+import { XIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import { TOrganizationRole } from "@continium/types/memberships";
+import { TOrganization } from "@continium/types/organizations";
+import { CONTINIUM_ENVIRONMENT_ID_LS } from "@/lib/localStorage";
+import { getAccessFlags } from "@/lib/membership/utils";
+import { getFormattedErrorMessage } from "@/lib/utils/helper";
+import { TOrganizationTeam } from "@/modules/ee/teams/team-list/types/team";
+import { inviteUserAction, leaveOrganizationAction } from "@/modules/organization/settings/teams/actions";
+import { ShareInviteModal } from "@/modules/organization/settings/teams/components/invite-member/share-invite-modal";
+import { InviteMemberModal } from "@/modules/organization/settings/teams/components/invite-member/invite-member-modal";
+import { TInvitee } from "@/modules/organization/settings/teams/types/invites";
+import { Button } from "@/modules/ui/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/modules/ui/components/dialog";
+
+interface OrganizationActionsProps {
+  role: TOrganizationRole;
+  membershipRole?: TOrganizationRole;
+  isLeaveOrganizationDisabled: boolean;
+  organization: TOrganization;
+  teams: TOrganizationTeam[];
+  isInviteDisabled: boolean;
+  isAccessControlAllowed: boolean;
+  isContiniumCloud: boolean;
+  environmentId: string;
+  isMultiOrgEnabled: boolean;
+  isUserManagementDisabledFromUi: boolean;
+  isStorageConfigured: boolean;
+  isTeamAdmin: boolean;
+  userAdminTeamIds?: string[];
+}
+
+export const OrganizationActions = ({
+  role,
+  organization,
+  membershipRole,
+  teams,
+  isLeaveOrganizationDisabled,
+  isInviteDisabled,
+  isAccessControlAllowed,
+  isContiniumCloud,
+  environmentId,
+  isMultiOrgEnabled,
+  isUserManagementDisabledFromUi,
+  isStorageConfigured,
+  isTeamAdmin,
+  userAdminTeamIds,
+}: OrganizationActionsProps) => {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const [isLeaveOrganizationModalOpen, setIsLeaveOrganizationModalOpen] = useState(false);
+  const [isInviteMemberModalOpen, setIsInviteMemberModalOpen] = useState(false);
+  const [showShareInviteModal, setShowShareInviteModal] = useState(false);
+  const [shareInviteToken, setShareInviteToken] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const { isOwner, isManager } = getAccessFlags(membershipRole);
+  const isOwnerOrManager = isOwner || isManager;
+
+  const canInvite = isOwnerOrManager || (isAccessControlAllowed && isTeamAdmin);
+
+  const handleLeaveOrganization = async () => {
+    setLoading(true);
+    try {
+      const result = await leaveOrganizationAction({ organizationId: organization.id });
+      if (result?.serverError) {
+        toast.error(getFormattedErrorMessage(result));
+        setLoading(false);
+        return;
+      }
+      toast.success(t("environments.settings.general.member_deleted_successfully"));
+      router.refresh();
+      setLoading(false);
+      localStorage.removeItem(CONTINIUM_ENVIRONMENT_ID_LS);
+      router.push("/");
+    } catch (err) {
+      toast.error(`Error: ${err instanceof Error ? err.message : "Unknown error occurred"}`);
+      setLoading(false);
+    }
+  };
+
+  const handleAddMembers = async (data: TInvitee[]) => {
+    if (data.length === 1) {
+      // Individual invite
+      const inviteUserActionResult = await inviteUserAction({
+        organizationId: organization.id,
+        email: data[0].email.toLowerCase(),
+        name: data[0].name,
+        role: data[0].role,
+        teamIds: data[0].teamIds,
+      });
+      if (inviteUserActionResult?.data) {
+        router.refresh();
+        if (inviteUserActionResult.data.emailSent) {
+          toast.success(t("environments.settings.general.member_invited_successfully"));
+        } else if (inviteUserActionResult.data.inviteToken) {
+          setShareInviteToken(inviteUserActionResult.data.inviteToken);
+          setShowShareInviteModal(true);
+          toast.success("Invite created. Email delivery is not configured, so share the invite link.");
+        }
+      } else {
+        const errorMessage = getFormattedErrorMessage(inviteUserActionResult);
+        toast.error(errorMessage);
+      }
+    } else {
+      const inviteResults: { email: string; success: boolean; emailSent: boolean }[] = [];
+      for (const { name, email, role, teamIds } of data) {
+        const inviteUserActionResult = await inviteUserAction({
+          organizationId: organization.id,
+          email: email.toLowerCase(),
+          name,
+          role,
+          teamIds,
+        });
+        inviteResults.push({
+          email,
+          success: Boolean(inviteUserActionResult?.data),
+          emailSent: Boolean(inviteUserActionResult?.data?.emailSent),
+        });
+      }
+      const failedInvites: string[] = [];
+      const successInvites: string[] = [];
+      const invitesWithoutEmail: string[] = [];
+      inviteResults.forEach((invite) => {
+        if (!invite.success) {
+          failedInvites.push(invite.email);
+        } else {
+          successInvites.push(invite.email);
+          if (!invite.emailSent) {
+            invitesWithoutEmail.push(invite.email);
+          }
+        }
+      });
+      if (failedInvites.length > 0) {
+        toast.error(`${failedInvites.length} ${t("environments.settings.general.invites_failed")}`);
+      }
+      if (successInvites.length > 0) {
+        toast.success(
+          `${successInvites.length} ${t("environments.settings.general.member_invited_successfully")}`
+        );
+      }
+      if (invitesWithoutEmail.length > 0) {
+        toast("Email delivery is not configured. Use the share-link button beside each pending invite.");
+      }
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-4 flex justify-end space-x-2 text-right">
+        {role !== "owner" && isMultiOrgEnabled && (
+          <Button variant="destructive" size="sm" onClick={() => setIsLeaveOrganizationModalOpen(true)}>
+            {t("environments.settings.general.leave_organization")}
+            <XIcon />
+          </Button>
+        )}
+
+        {!isInviteDisabled && canInvite && !isUserManagementDisabledFromUi && (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => {
+              setIsInviteMemberModalOpen(true);
+            }}>
+            {t("environments.settings.teams.invite_member")}
+          </Button>
+        )}
+      </div>
+      <InviteMemberModal
+        open={isInviteMemberModalOpen}
+        setOpen={setIsInviteMemberModalOpen}
+        onSubmit={handleAddMembers}
+        membershipRole={membershipRole}
+        isAccessControlAllowed={isAccessControlAllowed}
+        isContiniumCloud={isContiniumCloud}
+        environmentId={environmentId}
+        teams={teams}
+        isStorageConfigured={isStorageConfigured}
+        isOwnerOrManager={isOwnerOrManager}
+        isTeamAdmin={isTeamAdmin}
+        userAdminTeamIds={userAdminTeamIds}
+      />
+
+      {showShareInviteModal && (
+        <ShareInviteModal
+          inviteToken={shareInviteToken}
+          open={showShareInviteModal}
+          setOpen={setShowShareInviteModal}
+        />
+      )}
+
+      <Dialog open={isLeaveOrganizationModalOpen} onOpenChange={setIsLeaveOrganizationModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("environments.settings.general.leave_organization_title")}</DialogTitle>
+            <DialogDescription>
+              {t("environments.settings.general.leave_organization_description")}
+            </DialogDescription>
+          </DialogHeader>
+          {isLeaveOrganizationDisabled && (
+            <p className="mt-2 text-sm text-red-700">
+              {t("environments.settings.general.cannot_leave_only_organization")}
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsLeaveOrganizationModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleLeaveOrganization}
+              loading={loading}
+              disabled={isLeaveOrganizationDisabled}>
+              {t("environments.settings.general.leave_organization_ok_btn_text")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};

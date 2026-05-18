@@ -1,0 +1,43 @@
+apiVersion: v2
+name: continium
+description: A Helm chart for Continium with PostgreSQL, Redis
+
+type: application
+
+# Helm chart Version
+version: 0.0.0-dev
+
+# This is the version number of the application being deployed.
+appVersion: "3.7.0"
+
+icon: https://continium.com/favicon.ico
+
+keywords:
+  - continium
+  - postgresql
+  - redis
+
+home: https://continium.com/docs/self-hosting/setup/kubernetes
+maintainers:
+  - name: Continium
+    email: info@continium.com
+
+dependencies:
+  - name: postgresql
+    version: "16.4.16"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: postgresql.enabled
+  - name: redis
+    version: 20.11.2
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: redis.enabled
+  - name: gateway-helm
+    alias: envoy
+    version: "v1.7.1"
+    repository: "oci://docker.io/envoyproxy"
+    condition: envoy.controller.enabled
+  - name: redis
+    alias: envoyRedis
+    version: 20.11.2
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: envoyRedis.enabled

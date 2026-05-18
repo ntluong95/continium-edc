@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "strict": true
+  },
+  "exclude": ["node_modules"],
+  "extends": "@continium/config-typescript/node16.json",
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "@continium/audit",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Append-only audit trail middleware and job contracts for Continium",
+  "main": "./dist/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "clean": "rimraf .turbo node_modules coverage dist",
+    "build": "rimraf dist && vite build && tsc --project tsconfig.build.json",
+    "lint": "eslint . --ext .ts,.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@continium/logger": "workspace:*",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@continium/config-typescript": "workspace:*",
+    "@continium/eslint-config": "workspace:*",
+    "rimraf": "6.0.1",
+    "vite": "7.3.3",
+    "vitest": "4.1.6"
+  }
+}

@@ -1,0 +1,685 @@
+// REDCap → Modern Platform — Prisma Schema (MVP)
+// Target: PostgreSQL 15+
+// Notes:
+//   * Every migrated model carries `legacyId` for shadow-read & rollback parity.
+//   * Postgres declarative partitioning for RecordValue (HASH by projectId)
+//     and AuditLog (RANGE by `at` monthly) is applied via raw SQL in the
+//     initial migration (see packages/database/migrations/0001_partitions.sql).
+//   * No model copies REDCap's *_temp split; drafts use a `draft` flag and
+//     publishes snapshot into FieldRevision.
+//   * Sharded redcap_data / redcap_log_event tables collapse to a single
+//     partitioned model behind a repository (see RecordRepository).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pg_trgm, pgcrypto]
+}
+
+// ---------- Identity (Auth.js compatible) ----------
+
+model User {
+  id              String    @id @default(cuid())
+  legacyId        Int?      @unique                   // ← redcap_user_information.ui_id
+  email           String    @unique
+  emailVerified   DateTime?
+  name            String?
+  image           String?
+  isSystemAdmin   Boolean   @default(false)
+  status          UserStatus @default(ACTIVE)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  apiTokens       ApiToken[]
+  orgMemberships  OrgMember[]
+  memberships     Membership[]
+  auditLogs       AuditLog[]   @relation("AuditActor")
+
+  @@index([status])
+}
+
+enum UserStatus { ACTIVE SUSPENDED PENDING }
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  password          String? // for credentials provider (argon2id)
+  totpSecret        String? // 2FA TOTP secret (replaces redcap_two_factor_response)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model ApiToken {
+  id          String   @id @default(cuid())
+  legacyToken String?  @unique // ← redcap_user_rights.api_token
+  userId      String
+  projectId   String?
+  name        String
+  hash        String   @unique
+  prefix      String   @unique // first 8 chars, shown to user
+  scopes      String[]         // e.g. ["records:read","records:write"]
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([projectId])
+}
+
+// ---------- Organizations (multi-tenant; new concept) ----------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  country   String?
+  createdAt DateTime @default(now())
+  members   OrgMember[]
+  projects  Project[]
+}
+
+enum OrgRole { OWNER ADMIN MEMBER }
+
+model OrgMember {
+  id     String  @id @default(cuid())
+  orgId  String
+  userId String
+  role   OrgRole @default(MEMBER)
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([orgId, userId])
+}
+
+// ---------- Projects ----------
+
+enum ProjectPurpose { PRACTICE OPERATIONAL_SUPPORT RESEARCH QA OTHER }
+
+model Project {
+  id            String   @id @default(cuid())
+  legacyId      Int?     @unique           // ← redcap_projects.project_id
+  orgId         String
+  title         String
+  purpose       ProjectPurpose @default(RESEARCH)
+  longitudinal  Boolean  @default(false)
+  surveyEnabled Boolean  @default(false)
+  randomizationEnabled Boolean @default(false)
+  status        ProjectStatus @default(DEVELOPMENT)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  setting       ProjectSetting?
+  forms         Form[]
+  fields        Field[]
+  arms          Arm[]
+  events        Event[]
+  records       Record[]
+  surveys       Survey[]
+  reports       Report[]
+  roles         Role[]
+  memberships   Membership[]
+  dags          DataAccessGroup[]
+  fileObjects   FileObject[]
+  apiTokens     ApiToken[]
+  fieldRevisions FieldRevision[]
+  auditLogs     AuditLog[]
+
+  @@index([orgId])
+}
+
+enum ProjectStatus { DEVELOPMENT PRODUCTION ARCHIVED }
+
+model ProjectSetting {
+  projectId      String  @id
+  recordIdField  String  @default("record_id")
+  customRecordId Boolean @default(false)
+  autoNumbering  Boolean @default(true)
+  recordLabel    String?
+  homepageText   String?
+  pdfHeaderText  String?
+  surveyAuthEnabled Boolean @default(false)
+  // long-tail REDCap settings spilled here
+  extra          Json    @default("{}")
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Forms / Fields / Branching ----------
+
+model Form {
+  id         String  @id @default(cuid())
+  legacyId   Int?    @unique
+  projectId  String
+  name       String  // variable-style: ^[a-z][a-z0-9_]*$
+  label      String
+  position   Int
+  draft      Boolean @default(false)
+  surveyId   String? @unique // 1:1 with Survey when enabled
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fields     Field[]
+  eventForms EventForm[]
+  survey     Survey? @relation("FormSurvey", fields: [surveyId], references: [id])
+
+  @@unique([projectId, name])
+  @@index([projectId, position])
+}
+
+enum FieldType {
+  TEXT NOTES NUMBER INTEGER DATE TIME DATETIME
+  RADIO CHECKBOX DROPDOWN YESNO TRUEFALSE
+  FILE DESCRIPTIVE CALC SLIDER SIGNATURE SECTION_HEADER
+}
+
+model ValidationType {
+  code        String  @id   // "integer", "email", "date_ymd", ...
+  label       String
+  regex       String?
+  jsType      String  // "string"|"number"|"date"
+}
+
+model Field {
+  id            String   @id @default(cuid())
+  legacyId      Int?     @unique
+  projectId     String
+  formId        String
+  key           String   // variable name; ^[a-z_][a-z0-9_]{0,63}$
+  label         String
+  type          FieldType
+  validationCode String?
+  minValue      String?
+  maxValue      String?
+  isRequired    Boolean  @default(false)
+  isIdentifier  Boolean  @default(false) // PHI flag
+  isPhi         Boolean  @default(false)
+  position      Int
+  matrixGroup   String?
+  matrixHeader  String?
+  fieldNote     String?
+  customAlign   String?
+  questionNum   String?
+  draft         Boolean  @default(false)
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  form          Form           @relation(fields: [formId], references: [id], onDelete: Cascade)
+  validation    ValidationType? @relation(fields: [validationCode], references: [code])
+  choices       FieldChoice[]
+  branching     BranchingRule[]
+
+  @@unique([projectId, key])
+  @@index([projectId, formId, position])
+}
+
+model FieldChoice {
+  id       String @id @default(cuid())
+  fieldId  String
+  code     String
+  label    String
+  position Int
+  field    Field  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  @@unique([fieldId, code])
+}
+
+enum BranchingKind { SHOW HIDE CALC }
+
+model BranchingRule {
+  id         String @id @default(cuid())
+  fieldId    String
+  kind       BranchingKind
+  expression String   // safe-AST expression; references Field.key
+  field      Field    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  @@index([fieldId])
+}
+
+model FieldRevision {
+  id          String   @id @default(cuid())
+  projectId   String
+  publishedAt DateTime @default(now())
+  publishedBy String
+  snapshot    Json     // { fields: [...], choices: [...], branching: [...] }
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId, publishedAt])
+}
+
+// ---------- Events / Arms (longitudinal) ----------
+
+model Arm {
+  id         String  @id @default(cuid())
+  legacyId   Int?    @unique
+  projectId  String
+  number     Int
+  name       String
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  events     Event[]
+  @@unique([projectId, number])
+}
+
+model Event {
+  id            String  @id @default(cuid())
+  legacyId      Int?    @unique
+  projectId     String
+  armId         String
+  name          String
+  description   String?
+  dayOffset     Int     @default(0)
+  offsetMinDays Int     @default(0)
+  offsetMaxDays Int     @default(0)
+  position      Int
+  arm           Arm     @relation(fields: [armId], references: [id], onDelete: Cascade)
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  forms         EventForm[]
+  repeats       RepeatingInstrument[]
+  @@index([projectId])
+}
+
+model EventForm {
+  eventId String
+  formId  String
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  form    Form  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  @@id([eventId, formId])
+}
+
+enum RepeatLevel { EVENT INSTRUMENT }
+
+model RepeatingInstrument {
+  id        String  @id @default(cuid())
+  eventId   String
+  formId    String?         // null when whole-event repeats
+  level     RepeatLevel
+  customLabel String?
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  @@unique([eventId, formId])
+}
+
+// ---------- Records / Values ----------
+
+enum RecordValueSource { DATA_ENTRY SURVEY IMPORT API CALC SYSTEM }
+
+model Record {
+  id         String   @id @default(cuid())
+  projectId  String
+  key        String   // human record id (e.g. "1001"); preserves REDCap "record" string
+  dagId      String?
+  status     RecordStatus @default(INCOMPLETE)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dag        DataAccessGroup? @relation(fields: [dagId], references: [id])
+  values     RecordValue[]
+  locks      RecordLock[]
+  signatures RecordSignature[]
+  responses  SurveyResponse[]
+
+  @@unique([projectId, key])
+  @@index([projectId, dagId])
+  @@index([projectId, updatedAt])
+}
+
+enum RecordStatus { INCOMPLETE UNVERIFIED COMPLETE }
+
+model RecordValue {
+  id          BigInt   @id @default(autoincrement())
+  projectId   String
+  recordKey   String           // denormalised; FK via composite to Record(projectId,key)
+  eventId     String?
+  fieldKey    String           // denormalised; field can be deleted, history kept
+  instance    Int      @default(1)
+  valueText   String?
+  valueNumber Decimal? @db.Decimal(38, 10)
+  valueDate   DateTime?
+  valueJson   Json?
+  valueFileId String?
+  setAt       DateTime @default(now())
+  setBy       String?
+  source      RecordValueSource @default(DATA_ENTRY)
+
+  record      Record   @relation(fields: [projectId, recordKey], references: [projectId, key], onDelete: Cascade)
+  file        FileObject? @relation(fields: [valueFileId], references: [id])
+
+  @@unique([projectId, recordKey, eventId, fieldKey, instance])
+  @@index([projectId, fieldKey])
+  @@index([projectId, recordKey])
+  @@index([setAt])
+}
+// Postgres: ALTER TABLE "RecordValue" PARTITION BY HASH ("projectId");
+
+enum LockLevel { RECORD FORM INSTANCE }
+
+model RecordLock {
+  id         String   @id @default(cuid())
+  projectId  String
+  recordId   String
+  formId     String?
+  eventId    String?
+  instance   Int?
+  level      LockLevel
+  lockedById String
+  lockedAt   DateTime @default(now())
+  reason     String?
+  record     Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  @@unique([recordId, formId, eventId, instance, level])
+}
+
+model RecordSignature {
+  id         String   @id @default(cuid())
+  recordId   String
+  formId     String
+  eventId    String?
+  instance   Int      @default(1)
+  signerId   String
+  signedAt   DateTime @default(now())
+  payloadHash String           // hash of values at sign time
+  fileId     String?           // optional PNG signature image
+  record     Record  @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  file       FileObject? @relation(fields: [fileId], references: [id])
+  @@unique([recordId, formId, eventId, instance])
+}
+
+// ---------- Survey engine ----------
+
+enum SurveyStatus { DRAFT OPEN PAUSED CLOSED }
+
+model Survey {
+  id          String   @id @default(cuid())
+  legacyId    Int?     @unique
+  projectId   String
+  formId      String   @unique
+  title       String
+  shortCode   String?  @unique
+  themeId     String?
+  status      SurveyStatus @default(DRAFT)
+  openText    String?
+  closeText   String?
+  authRequired Boolean @default(false)
+  saveAndReturn Boolean @default(false)
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  formRel     Form?    @relation("FormSurvey")
+  theme       SurveyTheme? @relation(fields: [themeId], references: [id])
+  participants Participant[]
+  responses   SurveyResponse[]
+  invitations Invitation[]
+}
+
+model SurveyTheme {
+  id          String @id @default(cuid())
+  name        String @unique
+  css         String
+  builtIn     Boolean @default(false)
+  surveys     Survey[]
+}
+
+model Participant {
+  id          String   @id @default(cuid())
+  legacyId    Int?     @unique
+  surveyId    String
+  email       String?
+  phone       String?
+  identifier  String?           // record link key
+  createdAt   DateTime @default(now())
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  invitations Invitation[]
+  responses   SurveyResponse[]
+  @@unique([surveyId, email])
+  @@index([surveyId])
+}
+
+enum InvitationChannel { EMAIL SMS LINK }
+
+model Invitation {
+  id          String   @id @default(cuid())
+  surveyId    String
+  participantId String?
+  channel     InvitationChannel @default(EMAIL)
+  hash        String   @unique
+  sentAt      DateTime?
+  usedAt      DateTime?
+  expiresAt   DateTime?
+  survey      Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  participant Participant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  @@index([surveyId])
+}
+
+model SurveyResponse {
+  id           String   @id @default(cuid())
+  legacyId     Int?     @unique
+  surveyId     String
+  participantId String?
+  recordId     String
+  payload      Json     // snapshot of submitted values for fast public display + PDF
+  submittedAt  DateTime @default(now())
+  ip           String?
+  userAgent    String?
+  durationSec  Int?
+  survey       Survey  @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  participant  Participant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  record       Record  @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  pdf          FileObject? @relation("SurveyPdf", fields: [pdfFileId], references: [id])
+  pdfFileId    String?
+  @@index([surveyId, submittedAt])
+}
+
+// ---------- RBAC + DAG ----------
+
+model Role {
+  id          String   @id @default(cuid())
+  legacyId    Int?     @unique
+  projectId   String
+  name        String
+  description String?
+  permissions String[] // typed-string list of Permission enum values
+  isBuiltin   Boolean  @default(false)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  memberships Membership[]
+  @@unique([projectId, name])
+}
+
+model Membership {
+  id         String   @id @default(cuid())
+  legacyId   Int?     @unique
+  projectId  String
+  userId     String
+  roleId     String
+  dagId      String?
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  dag        DataAccessGroup? @relation(fields: [dagId], references: [id], onDelete: SetNull)
+  @@unique([projectId, userId])
+  @@index([projectId, dagId])
+}
+
+model DataAccessGroup {
+  id         String   @id @default(cuid())
+  legacyId   Int?     @unique
+  projectId  String
+  name       String
+  uniqueGroupName String?  // for API parity
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  members    DagMember[]
+  records    Record[]
+  memberships Membership[]
+  @@unique([projectId, name])
+}
+
+model DagMember {
+  id     String @id @default(cuid())
+  dagId  String
+  userId String
+  dag    DataAccessGroup @relation(fields: [dagId], references: [id], onDelete: Cascade)
+  @@unique([dagId, userId])
+}
+
+// ---------- Reports ----------
+
+enum ReportKind { LIST FORM_STATUS DASHBOARD }
+
+model Report {
+  id         String   @id @default(cuid())
+  legacyId   Int?     @unique
+  projectId  String
+  name       String
+  kind       ReportKind @default(LIST)
+  description String?
+  createdById String
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fields     ReportField[]
+  filters    ReportFilter[]
+  access     ReportAccess[]
+  @@index([projectId])
+}
+
+model ReportField {
+  id       String @id @default(cuid())
+  reportId String
+  fieldKey String
+  position Int
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@unique([reportId, fieldKey])
+}
+
+enum ReportFilterOp { EQ NEQ LT LTE GT GTE IN NOT_IN CONTAINS NOT_NULL IS_NULL }
+
+model ReportFilter {
+  id       String @id @default(cuid())
+  reportId String
+  fieldKey String?      // null when filtering on event/dag
+  eventId  String?
+  dagId    String?
+  op       ReportFilterOp
+  value    Json
+  report   Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+enum ReportAccessKind { VIEW EDIT }
+enum ReportPrincipalKind { USER ROLE DAG }
+
+model ReportAccess {
+  id          String @id @default(cuid())
+  reportId    String
+  kind        ReportAccessKind
+  principal   ReportPrincipalKind
+  principalId String
+  report      Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@unique([reportId, kind, principal, principalId])
+}
+
+// ---------- Files ----------
+
+model FileObject {
+  id          String   @id @default(cuid())
+  legacyId    Int?     @unique           // ← redcap_edocs_metadata.doc_id
+  projectId   String?
+  storage     String                    // "s3" | "r2" | "local"
+  key         String                    // bucket key
+  filename    String
+  mimeType    String
+  sizeBytes   Int
+  sha256      String
+  uploadedById String?
+  uploadedAt  DateTime @default(now())
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  bindings    FileBinding[]
+  recordValues RecordValue[]
+  recordSignatures RecordSignature[]
+  surveyResponses SurveyResponse[] @relation("SurveyPdf")
+  @@index([projectId])
+}
+
+enum FileBindingTarget { PROJECT_DOC RECORD_FIELD SURVEY_PDF FORM_LOCK_PDF E_CONSENT }
+
+model FileBinding {
+  id        String @id @default(cuid())
+  fileId    String
+  target    FileBindingTarget
+  refKey    String   // composite ref encoded as JSON-string
+  file      FileObject @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  @@index([target, refKey])
+}
+
+// ---------- Audit ----------
+
+enum AuditEvent {
+  USER_REGISTERED USER_LOGIN USER_LOGIN_FAILED USER_LOGOUT
+  ORG_CREATED ORG_MEMBER_ADDED ORG_MEMBER_REMOVED
+  PROJECT_CREATED PROJECT_UPDATED PROJECT_DELETED PROJECT_STATUS_CHANGED
+  FORM_CREATED FORM_UPDATED FORM_DELETED
+  FIELD_CREATED FIELD_UPDATED FIELD_DELETED
+  METADATA_PUBLISHED
+  RECORD_CREATED RECORD_UPDATED RECORD_DELETED RECORD_RESTORED
+  RECORD_VALUE_SET RECORD_LOCKED RECORD_UNLOCKED RECORD_SIGNED
+  SURVEY_ENABLED SURVEY_OPENED SURVEY_CLOSED SURVEY_SUBMITTED
+  PARTICIPANT_ADDED PARTICIPANT_REMOVED INVITATION_SENT INVITATION_USED
+  ROLE_CREATED ROLE_UPDATED ROLE_DELETED MEMBERSHIP_GRANTED MEMBERSHIP_REVOKED
+  DAG_CREATED DAG_DELETED DAG_ASSIGNED
+  REPORT_CREATED REPORT_UPDATED REPORT_RAN
+  RECORDS_EXPORTED EXPORT_PHI_REDACTED
+  FILE_UPLOADED FILE_DELETED
+  API_TOKEN_CREATED API_TOKEN_REVOKED
+  PERMISSION_DENIED
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  legacyId   BigInt?  @unique
+  at         DateTime @default(now())
+  actorId    String?
+  actorIp    String?
+  projectId  String?
+  recordId   String?
+  fieldKey   String?
+  event      AuditEvent
+  details    Json?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  @@index([projectId, at])
+  @@index([recordId, at])
+  @@index([event, at])
+}
+// Postgres: ALTER TABLE "AuditLog" PARTITION BY RANGE ("at"); managed by pg_partman.
+
+// ---------- System ----------
+
+model SystemSetting {
+  key   String @id   // ← redcap_config.field_name
+  value Json
+  updatedAt DateTime @updatedAt
+}
