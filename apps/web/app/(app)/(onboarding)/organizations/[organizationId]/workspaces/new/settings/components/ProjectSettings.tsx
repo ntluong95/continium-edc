@@ -16,6 +16,7 @@ import {
 } from "@continium/types/project";
 import { createProjectAction } from "@/app/(app)/environments/[environmentId]/actions";
 import { previewSurvey } from "@/app/lib/templates";
+import { toJsEnvironmentStateSurvey } from "@/lib/survey/client-utils";
 import { CONTINIUM_SURVEYS_FILTERS_KEY_LS } from "@/lib/localStorage";
 import { buildStylingFromBrandColor } from "@/lib/styling/constants";
 import { getFormattedErrorMessage } from "@/lib/utils/helper";
@@ -244,7 +245,7 @@ export const ProjectSettings = ({
         <SurveyInline
           appUrl={publicDomain}
           isPreviewMode={true}
-          survey={previewSurvey(projectName || t("common.my_product"), t)}
+          survey={toJsEnvironmentStateSurvey(previewSurvey(projectName || t("common.my_product"), t))}
           styling={previewStyling}
           isBrandingEnabled={false}
           languageCode="default"
