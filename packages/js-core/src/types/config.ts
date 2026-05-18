@@ -21,6 +21,7 @@ export type TEnvironmentStateSurvey = Pick<
   | "isBackButtonHidden"
   | "isAutoProgressingEnabled"
   | "recaptcha"
+  | "name"
 > & {
   languages: (SurveyLanguage & { language: Language })[];
   triggers: { actionClass: ActionClass }[];
