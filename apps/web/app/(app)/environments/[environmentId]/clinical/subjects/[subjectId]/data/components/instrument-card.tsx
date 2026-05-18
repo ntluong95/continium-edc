@@ -98,7 +98,7 @@ export const StatusControl = ({ environmentId, record }: StatusControlProps) => 
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {dropdownOptions.map((option) => (
+          {dropdownOptions.map((option: RecordStatus) => (
             <SelectItem key={option} value={option}>
               {RECORD_STATUS_LABELS[option]}
             </SelectItem>
