@@ -76,42 +76,37 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
   if (!subject) return null;
 
   const enrollment = subject.enrollments[0] ?? null;
-  const getEnrollmentEvents = () =>
-    enrollment
-      ? prisma.event.findMany({
-          where: { armId: enrollment.armId },
-          orderBy: { position: "asc" },
-          include: {
-            instruments: {
-              include: {
-                instrument: {
-                  include: {
-                    fields: { orderBy: { position: "asc" } },
-                    survey: {
-                      select: {
-                        id: true,
-                        name: true,
-                        type: true,
-                        status: true,
-                        welcomeCard: true,
-                        blocks: true,
-                        endings: true,
-                        hiddenFields: true,
-                        variables: true,
-                        styling: true,
-                        singleUse: true,
-                      },
-                    },
-                  },
+  let events = await prisma.event.findMany({
+    where: enrollment ? { armId: enrollment.armId } : { id: { in: [] } },
+    orderBy: { position: "asc" },
+    include: {
+      instruments: {
+        include: {
+          instrument: {
+            include: {
+              fields: { orderBy: { position: "asc" } },
+              survey: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                  status: true,
+                  welcomeCard: true,
+                  blocks: true,
+                  endings: true,
+                  hiddenFields: true,
+                  variables: true,
+                  styling: true,
+                  singleUse: true,
                 },
               },
-              orderBy: { instrument: { displayName: "asc" } },
             },
           },
-        })
-      : [];
-
-  let events = await getEnrollmentEvents();
+        },
+        orderBy: { instrument: { displayName: "asc" } },
+      },
+    },
+  });
   let visibleEvents = events;
 
   const missingFieldInstrumentIds = visibleEvents.flatMap((event) =>
@@ -148,7 +143,7 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
 
   const valuesByRecord = new Map<string, typeof values>();
   for (const value of values) {
-    const existing = valuesByRecord.get(value.recordId) ?? [];
+    const existing = valuesByRecord.get(value.recordId) ?? ([] as typeof values);
     existing.push(value);
     valuesByRecord.set(value.recordId, existing);
   }
@@ -156,7 +151,7 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
   const recordsByBinding = new Map<string, typeof records>();
   for (const record of records) {
     const key = `${record.eventId}:${record.instrumentId}`;
-    const existing = recordsByBinding.get(key) ?? [];
+    const existing = recordsByBinding.get(key) ?? ([] as typeof records);
     existing.push(record);
     recordsByBinding.set(key, existing);
   }
