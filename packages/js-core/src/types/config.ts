@@ -25,7 +25,7 @@ export type TEnvironmentStateSurvey = Pick<
 > & {
   languages: (SurveyLanguage & { language: Language })[];
   triggers: { actionClass: ActionClass }[];
-  segment?: { id: string; hasFilters: boolean } | null;
+  segment?: { id: string; hasFilters?: boolean } | null;
   displayPercentage: number;
   type: "link" | "app";
   styling?: TSurveyStyling;
