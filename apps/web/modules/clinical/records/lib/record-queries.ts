@@ -1,5 +1,6 @@
 import "server-only";
-import { AuditEvent, InstrumentStatus } from "@prisma/client";
+import { AuditEvent, InstrumentStatus, RecordStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { prisma, withDagContextAsync } from "@continium/database";
 import { authOptions } from "@/modules/auth/lib/authOptions";
@@ -11,6 +12,29 @@ import { logClinicalAuditEvent } from "@/modules/clinical/subjects/lib/audit-eve
 import { getClinicalStudyContext } from "@/modules/clinical/subjects/lib/subject-access";
 import { getInstrumentDataEntryState } from "./data-entry-eligibility";
 import { displayValue } from "./value-coercion";
+
+// Explicit types to prevent TypeScript depth-limit inference failures on
+// deeply nested Prisma return types.
+export type TDataEntryRecordValue = {
+  id: string;
+  recordId: string;
+  instrumentFieldId: string;
+  valueText: string | null;
+  valueNumber: string | null;
+  valueDate: Date | null;
+  valueJson: Prisma.JsonValue;
+  updatedAt: Date;
+  displayValue: string | null;
+};
+
+export type TDataEntryRecord = {
+  id: string;
+  instance: number;
+  status: RecordStatus;
+  lockedAt: Date | null;
+  responsesJson: Record<string, unknown>;
+  values: TDataEntryRecordValue[];
+};
 
 const selectRecordValue = {
   id: true,
@@ -212,13 +236,13 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
         repeating: binding.repeating,
         instrument: binding.instrument,
         dataEntry: getInstrumentDataEntryState(binding.instrument),
-        records: (recordsByBinding.get(`${event.id}:${binding.instrumentId}`) ?? []).map((record) => ({
+        records: (recordsByBinding.get(`${event.id}:${binding.instrumentId}`) ?? ([] as typeof records)).map((record): TDataEntryRecord => ({
           id: record.id,
           instance: record.instance,
           status: record.status,
           lockedAt: record.lockedAt,
           responsesJson: (record.responsesJson ?? {}) as Record<string, unknown>,
-          values: (valuesByRecord.get(record.id) ?? []).map((value) => ({
+          values: (valuesByRecord.get(record.id) ?? ([] as typeof values)).map((value): TDataEntryRecordValue => ({
             ...value,
             valueNumber: value.valueNumber?.toString() ?? null,
             displayValue: displayValue(value.valueText, value.valueNumber, value.valueDate, value.valueJson),
@@ -235,4 +259,4 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
 export type TSubjectDataEntry = NonNullable<Awaited<ReturnType<typeof getSubjectDataEntry>>>;
 export type TDataEntryEvent = TSubjectDataEntry["events"][number];
 export type TDataEntryInstrument = TDataEntryEvent["instruments"][number];
-export type TDataEntryRecord = TDataEntryInstrument["records"][number];
+// TDataEntryRecord and TDataEntryRecordValue are explicitly defined at top of file
