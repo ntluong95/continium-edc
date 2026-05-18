@@ -146,7 +146,8 @@ export const InstrumentCard = ({ environmentId, subjectId, binding }: Instrument
   const formHref = binding.instrument.surveyId
     ? `/environments/${environmentId}/forms/${binding.instrument.surveyId}/edit`
     : null;
-  const valuesByField = new Map(record?.values.map((value) => [value.instrumentFieldId, value]));
+  type TRecordValue = TDataEntryRecord["values"][number];
+  const valuesByField = new Map<string, TRecordValue>((record?.values ?? [] as TRecordValue[]).map((value) => [value.instrumentFieldId, value]));
   const isLocked = record?.status === RecordStatus.LOCKED;
   const hasValues = record && record.values.length > 0;
   const hasFields = binding.instrument.fields.length > 0;

@@ -5,7 +5,7 @@ import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useTransition } from "react";
 import { useActionToast } from "@/modules/clinical/protocol/lib/use-action-toast";
-import type { TDataEntryInstrument } from "@/modules/clinical/records/lib/record-queries";
+import type { TDataEntryInstrument, TDataEntryRecord } from "@/modules/clinical/records/lib/record-queries";
 import {
   RECORD_STATUS_BADGES,
   RECORD_STATUS_LABELS,
@@ -105,8 +105,9 @@ export const RepeatingInstrumentTable = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {binding.records.map((record) => {
-                  const valuesByField = new Map(
-                    record.values.map((value) => [value.instrumentFieldId, value])
+                  type TRecordValue = TDataEntryRecord["values"][number];
+                  const valuesByField = new Map<string, TRecordValue>(
+                    record.values.map((value: TRecordValue) => [value.instrumentFieldId, value])
                   );
                   const isLocked = record.status === RecordStatus.LOCKED;
                   return (
