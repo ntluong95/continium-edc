@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import type { TSubjectDataEntry } from "@/modules/clinical/records/lib/record-queries";
+import type { TDataEntryEvent, TSubjectDataEntry } from "@/modules/clinical/records/lib/record-queries";
 
 interface EventTabsProps {
   environmentId: string;
@@ -15,7 +15,7 @@ export const EventTabs = ({ environmentId, subjectId, events, selectedEventId }:
   return (
     <div className="overflow-x-auto rounded-lg bg-slate-100 p-1 [scrollbar-width:none]">
       <div className="flex min-w-max gap-1">
-        {events.map((event) => {
+        {events.map((event: TDataEntryEvent) => {
           const isSelected = event.id === selectedEventId;
           return (
             <Link
