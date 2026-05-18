@@ -141,12 +141,10 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
     orderBy: [{ eventId: "asc" }, { instrumentId: "asc" }, { instance: "asc" }],
   });
 
-  const values = records.length
-    ? await prisma.recordValue.findMany({
-        where: { projectId: project.id, recordId: { in: records.map((record) => record.id) } },
-        select: selectRecordValue,
-      })
-    : [];
+  const values = await prisma.recordValue.findMany({
+    where: { projectId: project.id, recordId: { in: records.map((record) => record.id) } },
+    select: selectRecordValue,
+  });
 
   const valuesByRecord = new Map<string, typeof values>();
   for (const value of values) {

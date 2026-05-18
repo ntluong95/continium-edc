@@ -107,7 +107,7 @@ export const RepeatingInstrumentTable = ({
                 {binding.records.map((record) => {
                   type TRecordValue = TDataEntryRecord["values"][number];
                   const valuesByField = new Map<string, TRecordValue>(
-                    record.values.map((value: TRecordValue) => [value.instrumentFieldId, value])
+                    record.values.map((value: TRecordValue) => [value.instrumentFieldId, value] as [string, TRecordValue])
                   );
                   const isLocked = record.status === RecordStatus.LOCKED;
                   return (
