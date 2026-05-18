@@ -1,10 +1,17 @@
 name: Migrate & Deploy (Free-tier Vercel)
 
-# Deploys the continium-edc app to Vercel Hobby.
-# Runs DB migrations (Supabase EDC) before triggering the deploy so a
-# failed migration aborts the release without restarting traffic on a
-# broken schema. This workflow is designed to run in the extracted
-# public continium-edc repo (Phase 1 of the free-tier deployment plan).
+# Deploys continium-edc to Vercel Hobby.
+# Runs Prisma migrations before deploy so a failed migration aborts the
+# release without restarting traffic on a broken schema.
+#
+# Required GitHub Secrets (Settings → Secrets → Actions):
+#   VERCEL_TOKEN      — Vercel personal access token
+#   VERCEL_ORG_ID     — team_R3XUO311oudUwaeX8fWTnHY3
+#   VERCEL_PROJECT_ID — prj_SKY5qAqVC9YJRpaa45Lw6JjxxFgH
+#   DIRECT_URL        — Supabase direct URL (postgres://:5432/...) for migrations
+#
+# DIRECT_URL is optional until Supabase is provisioned; the migrate step is
+# skipped automatically when the secret is empty.
 
 on:
   push:
@@ -23,31 +30,38 @@ jobs:
     name: EDC — Prisma migrate:deploy
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      # Supabase direct URL (pooler URL is not suitable for migrations)
-      DIRECT_URL: ${{ secrets.DIRECT_URL }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Skip if no database URL
+        if: ${{ secrets.DIRECT_URL == '' }}
+        run: |
+          echo "DIRECT_URL secret not set — skipping migration step."
+          echo "Provision Supabase and add DIRECT_URL to repo secrets to enable migrations."
+
       - uses: pnpm/action-setup@v3
+        if: ${{ secrets.DIRECT_URL != '' }}
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v4
+        if: ${{ secrets.DIRECT_URL != '' }}
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
 
       - name: Install dependencies
+        if: ${{ secrets.DIRECT_URL != '' }}
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
+        if: ${{ secrets.DIRECT_URL != '' }}
         run: pnpm --filter @continium/database generate
 
       - name: Run EDC migrations
+        if: ${{ secrets.DIRECT_URL != '' }}
         run: pnpm --filter @continium/database migrate:deploy
         env:
-          # Prisma uses DIRECT_URL for migrate:deploy
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
@@ -56,6 +70,9 @@ jobs:
     needs: migrate-edc
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -73,12 +90,16 @@ jobs:
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
       - name: Build project
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
 
       - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/web
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $URL"
+
+      - name: Deployment summary
+        run: echo "### Deployed to ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
