@@ -1,5 +1,5 @@
+import { Prisma } from "@prisma/client/extension";
 import { randomUUID } from "node:crypto";
-import { Prisma } from "@prisma/client";
 import { logger } from "@continium/logger";
 import { getAuditContext } from "./context";
 import { computeDiff } from "./diff";
@@ -58,15 +58,14 @@ export type AuditMiddlewareOptions = {
  *
  * AuditLog model writes are silently skipped to prevent infinite loops.
  */
-export const createAuditMiddleware = ({ write, enabled = true }: AuditMiddlewareOptions): PrismaMiddlewareFn => {
+export const createAuditMiddleware = ({
+  write,
+  enabled = true,
+}: AuditMiddlewareOptions): PrismaMiddlewareFn => {
   return async (params: PrismaMiddlewareParams, next) => {
     const result = await next(params);
 
-    if (
-      !enabled ||
-      !WRITE_OPERATIONS.has(params.action) ||
-      params.model === "AuditLog"
-    ) {
+    if (!enabled || !WRITE_OPERATIONS.has(params.action) || params.model === "AuditLog") {
       return result;
     }
 
@@ -155,10 +154,7 @@ export const auditWriteExtensionHook = async <T>(
         projectId: extractProjectId(args),
         resourceId: extractResourceId(result),
         resourceType: model ?? null,
-        diff: computeDiff(
-          { model, action: operation, args, dataPath: [], runInTransaction: false },
-          result
-        ),
+        diff: computeDiff({ model, action: operation, args, dataPath: [], runInTransaction: false }, result),
         metadata: { prismaModel: model ?? null, prismaAction: operation },
       };
       await options.write(envelope);
