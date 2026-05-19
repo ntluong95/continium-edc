@@ -6,6 +6,7 @@ name: Migrate and Deploy Free Tier
 #   VERCEL_PROJECT_ID - prj_SKY5qAqVC9YJRpaa45Lw6JjxxFgH
 #   DIRECT_URL        - Supabase direct URL (postgres://...:5432/...) for migrations
 #   DATABASE_URL      - Supabase pooler URL (postgres://...:6543/...) for runtime
+#   JOBS_DATABASE_URL - Supabase session pooler (postgres://...:5432/...) for jobs/queues
 
 on:
   push:
@@ -84,6 +85,16 @@ jobs:
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Inject database env vars for build
+        # DATABASE_URL and JOBS_DATABASE_URL are not in Vercel project settings;
+        # append them to the pulled env file so vercel build / next build can validate them.
+        run: |
+          printf 'DATABASE_URL=%s\n' "$DATABASE_URL" >> .vercel/.env.production.local
+          printf 'JOBS_DATABASE_URL=%s\n' "$JOBS_DATABASE_URL" >> .vercel/.env.production.local
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JOBS_DATABASE_URL: ${{ secrets.JOBS_DATABASE_URL }}
 
       - name: Build project with Vercel
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
