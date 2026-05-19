@@ -42,6 +42,7 @@ import {
 } from "./utils";
 
 const RESPONSES_PER_PAGE = 10;
+type TResponseDbClient = Pick<typeof prisma, "response">;
 
 export const responseSelection = {
   id: true,
@@ -486,7 +487,7 @@ export const getResponsesByEnvironmentId = reactCache(
 export const updateResponse = async (
   responseId: string,
   responseInput: TResponseUpdateInput,
-  tx?: Prisma.TransactionClient
+  tx?: TResponseDbClient
 ): Promise<TResponse> => {
   validateInputs([responseId, ZId], [responseInput, ZResponseUpdateInput]);
   try {

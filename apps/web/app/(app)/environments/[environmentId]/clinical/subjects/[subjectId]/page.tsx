@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { EnrollmentStatus } from "@prisma/client";
 import { getProjectByEnvironmentId } from "@/lib/project/service";
 import { assertClinicalProject } from "@/modules/clinical/lib/assert-clinical-project";
 import { withReadEventScope } from "@/modules/clinical/audit/lib/dedupe-read-event";
@@ -17,6 +18,24 @@ interface SubjectDetailPageProps {
   params: Promise<{ environmentId: string; subjectId: string }>;
 }
 
+interface SubjectDetailEnrollmentEvent {
+  id: string;
+  occurredAt: Date;
+  fromStatus: EnrollmentStatus | null;
+  toStatus: EnrollmentStatus;
+  byUserId: string | null;
+  reason: string | null;
+}
+
+interface SubjectDetailEnrollment {
+  id: string;
+  status: EnrollmentStatus;
+  createdAt: Date;
+  enrolledAt: Date | null;
+  arm: { name: string };
+  events: SubjectDetailEnrollmentEvent[];
+}
+
 const formatDateTime = (value: Date) =>
   new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
@@ -32,7 +51,8 @@ const SubjectDetailPage = async ({ params }: SubjectDetailPageProps) => {
   const subject = await withReadEventScope(() => getSubjectDetail(environmentId, subjectId));
   if (!subject) notFound();
 
-  const latestEnrollment = subject.enrollments[0] ?? null;
+  const enrollments = subject.enrollments as SubjectDetailEnrollment[];
+  const latestEnrollment = enrollments[0] ?? null;
   const contactLabel = formatContactLabel(subject.contact);
 
   return (
@@ -83,7 +103,7 @@ const SubjectDetailPage = async ({ params }: SubjectDetailPageProps) => {
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Enrollment records</p>
-              <p className="mt-1 text-sm text-slate-900">{subject.enrollments.length}</p>
+              <p className="mt-1 text-sm text-slate-900">{enrollments.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -113,10 +133,10 @@ const SubjectDetailPage = async ({ params }: SubjectDetailPageProps) => {
           <CardTitle className="text-lg text-slate-900">Enrollment history</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {subject.enrollments.length === 0 ? (
+          {enrollments.length === 0 ? (
             <p className="text-sm text-slate-500">No enrollments recorded.</p>
           ) : (
-            subject.enrollments.map((enrollment, index) => (
+            enrollments.map((enrollment, index) => (
               <div key={enrollment.id} className="overflow-hidden rounded-lg border border-slate-200">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
                   <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { createId } from "@paralleldrive/cuid2";
 import type { TFunction } from "i18next";
 import { TSurveyElementTypeEnum } from "@continium/types/surveys/elements";
+import type { TJsEnvironmentStateSurvey } from "@continium/types/js";
 import type { TSurveyOpenTextElement } from "@continium/types/surveys/elements";
 import type { TSurvey } from "@continium/types/surveys/types";
 import type { TTemplate } from "@continium/types/templates";
@@ -4802,7 +4803,9 @@ export const customSurveyTemplate = (t: TFunction): TTemplate => {
   };
 };
 
-export const previewSurvey = (projectName: string, t: TFunction): TSurvey => {
+type TPreviewSurvey = TSurvey & TJsEnvironmentStateSurvey;
+
+export const previewSurvey = (projectName: string, t: TFunction): TPreviewSurvey => {
   return {
     id: "cltxxaa6x0000g8hacxdxejeu",
     createdAt: new Date(),

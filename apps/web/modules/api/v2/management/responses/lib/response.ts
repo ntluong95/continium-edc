@@ -17,6 +17,8 @@ import { ApiErrorResponseV2 } from "@/modules/api/v2/types/api-error";
 import { ApiResponseWithMeta } from "@/modules/api/v2/types/api-success";
 import { evaluateResponseQuotas } from "@/modules/ee/quotas/lib/evaluation-service";
 
+type TResponseDbClient = Pick<typeof prisma, "response">;
+
 export const getResponses = async (
   environmentIds: string[],
   params: TGetResponsesFilter
@@ -51,7 +53,7 @@ export const getResponses = async (
 export const createResponse = async (
   environmentId: string,
   responseInput: TResponseInput,
-  tx?: Prisma.TransactionClient
+  tx?: TResponseDbClient
 ): Promise<Result<Response, ApiErrorResponseV2>> => {
   const {
     surveyId,

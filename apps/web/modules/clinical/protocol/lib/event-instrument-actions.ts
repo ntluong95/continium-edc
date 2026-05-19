@@ -38,11 +38,12 @@ const revalidateProtocolAndForms = (environmentId: string) => {
 
 /** Finds or auto-creates a PUBLISHED instrument for the given survey + study. */
 async function ensurePublishedInstrument(
-  tx: Prisma.TransactionClient,
+  tx: unknown,
   studyId: string,
   survey: { id: string; name: string; blocks: unknown }
 ): Promise<string> {
-  const existing = await tx.instrument.findFirst({
+  const instrumentDb = tx as Pick<typeof prisma, "instrument" | "instrumentField">;
+  const existing = await instrumentDb.instrument.findFirst({
     where: { studyId, surveyId: survey.id, status: InstrumentStatus.PUBLISHED },
     select: { id: true },
     orderBy: { version: "desc" },
@@ -52,13 +53,13 @@ async function ensurePublishedInstrument(
   const snapshot = snapshotFromSurvey(survey);
   const sourceSurveyHash = buildSurveySourceHash(survey);
   const fieldHash = buildInstrumentFieldHash(snapshot.fields);
-  const maxVersion = await tx.instrument.aggregate({
+  const maxVersion = await instrumentDb.instrument.aggregate({
     where: { studyId, surveyId: survey.id },
     _max: { version: true },
   });
   const version = (maxVersion._max.version ?? 0) + 1;
 
-  const instrument = await tx.instrument.create({
+  const instrument = await instrumentDb.instrument.create({
     data: {
       studyId,
       surveyId: survey.id,
@@ -73,7 +74,7 @@ async function ensurePublishedInstrument(
   });
 
   if (snapshot.fields.length > 0) {
-    await tx.instrumentField.createMany({
+    await instrumentDb.instrumentField.createMany({
       data: snapshot.fields.map((field) => ({
         instrumentId: instrument.id,
         key: field.key,

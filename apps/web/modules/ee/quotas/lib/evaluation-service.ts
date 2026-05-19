@@ -1,8 +1,9 @@
 import "server-only";
-import { Prisma, Response } from "@prisma/client";
+import { Response } from "@prisma/client";
 import { prisma } from "@continium/database";
 import { logger } from "@continium/logger";
 import { TSurveyQuota } from "@continium/types/quota";
+import { toJsEnvironmentStateSurvey } from "@/lib/survey/client-utils";
 import { getSurvey } from "@/lib/survey/service";
 import { getQuotas } from "./quotas";
 import { evaluateQuotas, handleQuotas } from "./utils";
@@ -14,7 +15,7 @@ export interface QuotaEvaluationInput {
   responseFinished: boolean;
   variables?: Response["variables"];
   language?: string;
-  tx?: Prisma.TransactionClient;
+  tx?: TQuotaEvaluationDbClient;
 }
 
 export interface QuotaEvaluationResult {
@@ -22,6 +23,8 @@ export interface QuotaEvaluationResult {
   shouldEndSurvey: boolean;
   refreshedResponse?: Response | null;
 }
+
+type TQuotaEvaluationDbClient = Pick<typeof prisma, "response" | "responseQuotaLink">;
 
 /**
  * Reusable common quota evaluation logic for all API versions
@@ -52,7 +55,13 @@ export const evaluateResponseQuotas = async (input: QuotaEvaluationInput): Promi
       return { shouldEndSurvey: false };
     }
     const isDefaultLanguage = survey.languages.find((lang) => lang.default)?.language.code === language;
-    const result = evaluateQuotas(survey, data, variables, quotas, isDefaultLanguage ? "default" : language);
+    const result = evaluateQuotas(
+      toJsEnvironmentStateSurvey(survey),
+      data,
+      variables,
+      quotas,
+      isDefaultLanguage ? "default" : language
+    );
 
     const quotaFull = await handleQuotas(surveyId, responseId, result, responseFinished, prismaClient);
 

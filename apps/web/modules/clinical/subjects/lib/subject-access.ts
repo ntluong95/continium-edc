@@ -1,5 +1,4 @@
 import "server-only";
-import { type Prisma } from "@prisma/client";
 import { prisma } from "@continium/database";
 import { ValidationError } from "@continium/types/errors";
 import { getProjectByEnvironmentId } from "@/lib/project/service";
@@ -7,8 +6,6 @@ import { assertClinicalProject } from "@/modules/clinical/lib/assert-clinical-pr
 import { ensureStudyForProject } from "@/modules/clinical/protocol/lib/study-queries";
 import { getUserDagIds } from "@/modules/clinical/dag/lib/dag-queries";
 import { getEnvironmentAuth } from "@/modules/environments/lib/utils";
-
-type TDbClient = Prisma.TransactionClient | typeof prisma;
 
 export const getClinicalStudyContext = async (environmentId: string) => {
   const project = await getProjectByEnvironmentId(environmentId);
@@ -18,8 +15,9 @@ export const getClinicalStudyContext = async (environmentId: string) => {
   return { project, study };
 };
 
-export const assertArmBelongsToStudy = async (armId: string, studyId: string, db: TDbClient = prisma) => {
-  const arm = await db.arm.findFirst({
+export const assertArmBelongsToStudy = async (armId: string, studyId: string, db: unknown = prisma) => {
+  const armDb = db as Pick<typeof prisma, "arm">;
+  const arm = await armDb.arm.findFirst({
     where: { id: armId, studyId },
     select: { id: true, studyId: true, name: true },
   });
@@ -34,9 +32,10 @@ export const assertArmBelongsToStudy = async (armId: string, studyId: string, db
 export const assertSubjectBelongsToStudy = async (
   subjectId: string,
   studyId: string,
-  db: TDbClient = prisma
+  db: unknown = prisma
 ) => {
-  const subject = await db.subject.findFirst({
+  const subjectDb = db as Pick<typeof prisma, "subject">;
+  const subject = await subjectDb.subject.findFirst({
     where: { id: subjectId, studyId },
     select: { id: true, studyId: true, contactId: true, externalId: true },
   });
@@ -51,9 +50,10 @@ export const assertSubjectBelongsToStudy = async (
 export const assertEnrollmentBelongsToStudy = async (
   enrollmentId: string,
   studyId: string,
-  db: TDbClient = prisma
+  db: unknown = prisma
 ) => {
-  const enrollment = await db.enrollment.findFirst({
+  const enrollmentDb = db as Pick<typeof prisma, "enrollment">;
+  const enrollment = await enrollmentDb.enrollment.findFirst({
     where: { id: enrollmentId, subject: { studyId } },
     include: {
       arm: { select: { id: true, name: true, studyId: true } },
@@ -71,9 +71,10 @@ export const assertEnrollmentBelongsToStudy = async (
 export const assertContactBelongsToEnvironment = async (
   contactId: string,
   environmentId: string,
-  db: TDbClient = prisma
+  db: unknown = prisma
 ) => {
-  const contact = await db.contact.findFirst({
+  const contactDb = db as Pick<typeof prisma, "contact">;
+  const contact = await contactDb.contact.findFirst({
     where: { id: contactId, environmentId },
     select: { id: true },
   });

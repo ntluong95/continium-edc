@@ -8,6 +8,8 @@ import { DatabaseError, InvalidInputError, ResourceNotFoundError } from "@contin
 import { TSurveyQuota, TSurveyQuotaInput } from "@continium/types/quota";
 import { validateInputs } from "@/lib/utils/validate";
 
+type TQuotaLimitDbClient = Pick<typeof prisma, "surveyQuota">;
+
 export const getQuota = reactCache(async (quotaId: string): Promise<TSurveyQuota> => {
   try {
     validateInputs([quotaId, ZId]);
@@ -110,9 +112,9 @@ export const deleteQuota = async (quotaId: string): Promise<TSurveyQuota> => {
   }
 };
 
-export const reduceQuotaLimits = async (quotaIds: string[], tx?: Prisma.TransactionClient): Promise<void> => {
+export const reduceQuotaLimits = async (quotaIds: string[], tx?: TQuotaLimitDbClient): Promise<void> => {
   try {
-    const prismaClient = tx ?? prisma;
+    const prismaClient = (tx ?? prisma) as unknown as TQuotaLimitDbClient;
     await prismaClient.surveyQuota.updateMany({
       where: {
         id: {

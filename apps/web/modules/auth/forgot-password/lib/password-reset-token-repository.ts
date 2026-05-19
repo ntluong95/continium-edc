@@ -1,5 +1,5 @@
 import "server-only";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@continium/database";
 import { ZId } from "@continium/types/common";
@@ -17,13 +17,14 @@ const passwordResetTokenSelection = {
 
 const ZTokenHash = z.string().min(1);
 
-type TPasswordResetTokenDbClient = PrismaClient | Prisma.TransactionClient;
+type TPasswordResetTokenDbClient = Pick<typeof prisma, "passwordResetToken">;
 
 export type TPasswordResetTokenRecord = Prisma.PasswordResetTokenGetPayload<{
   select: typeof passwordResetTokenSelection;
 }>;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TPasswordResetTokenDbClient => tx ?? prisma;
+const getDbClient = (tx?: TPasswordResetTokenDbClient): TPasswordResetTokenDbClient =>
+  (tx ?? prisma) as unknown as TPasswordResetTokenDbClient;
 
 const handleDatabaseError = (error: unknown): never => {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -37,7 +38,7 @@ export const upsertActiveToken = async (
   userId: string,
   tokenHash: string,
   expiresAt: Date,
-  tx?: Prisma.TransactionClient
+  tx?: TPasswordResetTokenDbClient
 ): Promise<TPasswordResetTokenRecord> => {
   validateInputs([userId, ZId], [tokenHash, ZTokenHash], [expiresAt, z.date()]);
 
@@ -64,7 +65,7 @@ export const upsertActiveToken = async (
 
 export const findByTokenHash = async (
   tokenHash: string,
-  tx?: Prisma.TransactionClient
+  tx?: TPasswordResetTokenDbClient
 ): Promise<TPasswordResetTokenRecord | null> => {
   validateInputs([tokenHash, ZTokenHash]);
 
@@ -82,7 +83,7 @@ export const findByTokenHash = async (
 
 export const deleteByTokenHash = async (
   tokenHash: string,
-  tx?: Prisma.TransactionClient
+  tx?: TPasswordResetTokenDbClient
 ): Promise<number> => {
   validateInputs([tokenHash, ZTokenHash]);
 
@@ -102,7 +103,7 @@ export const deleteByTokenHash = async (
 export const consumeActiveToken = async (
   tokenHash: string,
   now: Date,
-  tx: Prisma.TransactionClient
+  tx: TPasswordResetTokenDbClient
 ): Promise<number> => {
   validateInputs([tokenHash, ZTokenHash], [now, z.date()]);
 

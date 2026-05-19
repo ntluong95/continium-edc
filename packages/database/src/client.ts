@@ -47,12 +47,13 @@ const prismaClientSingleton = () => {
     .$extends(createDagPrismaExtension());
 };
 
-type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
+type PrismaClientSingleton = PrismaClient;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClientSingleton | undefined;
 };
 
-export const prisma: PrismaClientSingleton = globalForPrisma.prisma ?? prismaClientSingleton();
+export const prisma: PrismaClientSingleton =
+  globalForPrisma.prisma ?? (prismaClientSingleton() as unknown as PrismaClientSingleton);
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

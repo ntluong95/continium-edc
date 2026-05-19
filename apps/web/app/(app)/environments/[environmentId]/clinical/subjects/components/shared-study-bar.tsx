@@ -24,6 +24,12 @@ interface SharedStudyBarProps {
   currentSearch?: string;
 }
 
+interface SharedStudyBarDashboard {
+  arm: { events: { instruments: unknown[] }[] };
+  subjects: unknown[];
+  statusLookup: Record<string, string>;
+}
+
 export const SharedStudyBar = async ({
   environmentId,
   arms,
@@ -33,11 +39,11 @@ export const SharedStudyBar = async ({
   currentSearch,
 }: SharedStudyBarProps) => {
   // Only fetch arm data when a specific arm is selected
-  const data = selectedArmId
+  const data = (selectedArmId
     ? await getRecordStatusDashboard(environmentId, selectedArmId)
-    : null;
+    : null) as SharedStudyBarDashboard | null;
 
-  const instrumentCount = data?.arm.events.reduce((n, e) => n + e.instruments.length, 0) ?? 0;
+  const instrumentCount = data?.arm.events.reduce((n, event) => n + event.instruments.length, 0) ?? 0;
   const subjectCount = data?.subjects.length ?? 0;
   const visitCount = data?.arm.events.length ?? 0;
   const totalCells = subjectCount * instrumentCount;

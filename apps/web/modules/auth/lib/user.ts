@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { cache as reactCache } from "react";
 import { prisma } from "@continium/database";
 import { PrismaErrorType } from "@continium/database/types/error";
@@ -7,11 +7,12 @@ import { DatabaseError, InvalidInputError, ResourceNotFoundError } from "@contin
 import { TUserCreateInput, TUserUpdateInput, ZUserEmail, ZUserUpdateInput } from "@continium/types/user";
 import { validateInputs } from "@/lib/utils/validate";
 
-type TUserDbClient = PrismaClient | Prisma.TransactionClient;
+type TUserDbClient = Pick<typeof prisma, "user">;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TUserDbClient => tx ?? prisma;
+const getDbClient = (tx?: TUserDbClient): TUserDbClient =>
+  (tx ?? prisma) as unknown as TUserDbClient;
 
-export const updateUser = async (id: string, data: TUserUpdateInput, tx?: Prisma.TransactionClient) => {
+export const updateUser = async (id: string, data: TUserUpdateInput, tx?: TUserDbClient) => {
   validateInputs([id, ZId], [data, ZUserUpdateInput.partial()]);
 
   try {
@@ -137,7 +138,7 @@ export const getUser = reactCache(async (id: string) => {
   }
 });
 
-export const createUser = async (data: TUserCreateInput, tx?: Prisma.TransactionClient) => {
+export const createUser = async (data: TUserCreateInput, tx?: TUserDbClient) => {
   validateInputs([data, ZUserUpdateInput]);
   try {
     const user = await getDbClient(tx).user.create({

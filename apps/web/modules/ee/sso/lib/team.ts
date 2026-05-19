@@ -1,5 +1,5 @@
 import "server-only";
-import { Organization, Prisma, PrismaClient, Team } from "@prisma/client";
+import { Organization, Team } from "@prisma/client";
 import { cache as reactCache } from "react";
 import { z } from "zod";
 import { prisma } from "@continium/database";
@@ -10,9 +10,10 @@ import { getMembershipByUserIdOrganizationId } from "@/lib/membership/service";
 import { validateInputs } from "@/lib/utils/validate";
 import { createTeamMembership } from "@/modules/auth/signup/lib/team";
 
-type TSsoTeamDbClient = PrismaClient | Prisma.TransactionClient;
+type TSsoTeamDbClient = Pick<typeof prisma, "team" | "teamUser" | "membership">;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TSsoTeamDbClient => tx ?? prisma;
+const getDbClient = (tx?: TSsoTeamDbClient): TSsoTeamDbClient =>
+  (tx ?? prisma) as unknown as TSsoTeamDbClient;
 
 export const getOrganizationByTeamId = reactCache(async (teamId: string): Promise<Organization | null> => {
   validateInputs([teamId, z.cuid2()]);
@@ -56,7 +57,7 @@ const getTeam = reactCache(async (teamId: string): Promise<Team> => {
   }
 });
 
-export const createDefaultTeamMembership = async (userId: string, tx?: Prisma.TransactionClient) => {
+export const createDefaultTeamMembership = async (userId: string, tx?: TSsoTeamDbClient) => {
   try {
     const prismaClient = getDbClient(tx);
     const defaultTeamId = DEFAULT_TEAM_ID;

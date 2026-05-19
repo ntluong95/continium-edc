@@ -36,16 +36,17 @@ const createInstrumentDraft = async ({
   survey,
   version,
 }: {
-  db: Prisma.TransactionClient;
+  db: unknown;
   fields: TInstrumentSnapshotField[];
   studyId: string;
   survey: { id: string; name: string; blocks: unknown } | null;
   version: number;
 }) => {
+  const instrumentDb = db as Pick<typeof prisma, "instrument" | "instrumentField">;
   const sourceSurveyHash = survey ? buildSurveySourceHash(survey) : null;
   const fieldHash = buildInstrumentFieldHash(fields);
 
-  const instrument = await db.instrument.create({
+  const instrument = await instrumentDb.instrument.create({
     data: {
       studyId,
       surveyId: survey?.id ?? null,
@@ -59,7 +60,7 @@ const createInstrumentDraft = async ({
   });
 
   if (fields.length > 0) {
-    await db.instrumentField.createMany({
+    await instrumentDb.instrumentField.createMany({
       data: fields.map((field) => ({
         instrumentId: instrument.id,
         key: field.key,
@@ -77,14 +78,15 @@ const createInstrumentDraft = async ({
   return { instrument, fieldHash, sourceSurveyHash };
 };
 
-const getRecordReferenceCount = async (db: Prisma.TransactionClient, instrumentId: string) => {
-  const [table] = await db.$queryRaw<Array<{ regclass: string | null }>>`
+const getRecordReferenceCount = async (db: unknown, instrumentId: string) => {
+  const queryDb = db as Pick<typeof prisma, "$queryRaw">;
+  const [table] = await queryDb.$queryRaw<Array<{ regclass: string | null }>>`
     SELECT to_regclass('public.record') AS regclass
   `;
 
   if (!table?.regclass) return 0;
 
-  const [count] = await db.$queryRaw<Array<{ count: bigint }>>`
+  const [count] = await queryDb.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*)::bigint AS count FROM "record" WHERE "instrument_id" = ${instrumentId}
   `;
 

@@ -9,10 +9,15 @@ import { Button } from "@/modules/ui/components/button";
 
 interface RemovedFromOrganizationProps {
   isContiniumCloud: boolean;
+  disableSsoReauth: boolean;
   user: TUser;
 }
 
-export const RemovedFromOrganization = ({ user, isContiniumCloud }: RemovedFromOrganizationProps) => {
+export const RemovedFromOrganization = ({
+  user,
+  isContiniumCloud,
+  disableSsoReauth,
+}: RemovedFromOrganizationProps) => {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   return (
@@ -29,6 +34,7 @@ export const RemovedFromOrganization = ({ user, isContiniumCloud }: RemovedFromO
         user={user}
         isContiniumCloud={isContiniumCloud}
         organizationsWithSingleOwner={[]}
+        disableSsoReauth={disableSsoReauth}
       />
       <Button
         onClick={() => {

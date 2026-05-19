@@ -1,14 +1,15 @@
 import "server-only";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@continium/database";
 import { ZId } from "@continium/types/common";
 import { DatabaseError } from "@continium/types/errors";
 import { validateInputs } from "@/lib/utils/validate";
 
-type TAuthSessionDbClient = PrismaClient | Prisma.TransactionClient;
+type TAuthSessionDbClient = Pick<typeof prisma, "session">;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TAuthSessionDbClient => tx ?? prisma;
+const getDbClient = (tx?: TAuthSessionDbClient): TAuthSessionDbClient =>
+  (tx ?? prisma) as unknown as TAuthSessionDbClient;
 
 const handleDatabaseError = (error: unknown): never => {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -20,7 +21,7 @@ const handleDatabaseError = (error: unknown): never => {
 
 export const deleteSessionsByUserId = async (
   userId: string,
-  tx?: Prisma.TransactionClient
+  tx?: TAuthSessionDbClient
 ): Promise<number> => {
   validateInputs([userId, ZId]);
 
@@ -39,7 +40,7 @@ export const deleteSessionsByUserId = async (
 
 export const deleteSessionBySessionToken = async (
   sessionToken: string,
-  tx?: Prisma.TransactionClient
+  tx?: TAuthSessionDbClient
 ): Promise<number> => {
   validateInputs([sessionToken, z.string().min(1)]);
 

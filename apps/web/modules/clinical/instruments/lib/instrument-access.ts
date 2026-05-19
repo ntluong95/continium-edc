@@ -1,12 +1,9 @@
 import "server-only";
-import { type Prisma } from "@prisma/client";
 import { prisma } from "@continium/database";
 import { ValidationError } from "@continium/types/errors";
 import { getProjectByEnvironmentId } from "@/lib/project/service";
 import { assertClinicalProject } from "@/modules/clinical/lib/assert-clinical-project";
 import { ensureStudyForProject } from "@/modules/clinical/protocol/lib/study-queries";
-
-type TDbClient = Prisma.TransactionClient | typeof prisma;
 
 export const getClinicalInstrumentContext = async (environmentId: string) => {
   const project = await getProjectByEnvironmentId(environmentId);
@@ -19,9 +16,10 @@ export const getClinicalInstrumentContext = async (environmentId: string) => {
 export const assertInstrumentBelongsToStudy = async (
   instrumentId: string,
   studyId: string,
-  db: TDbClient = prisma
+  db: unknown = prisma
 ) => {
-  const instrument = await db.instrument.findFirst({
+  const instrumentDb = db as Pick<typeof prisma, "instrument">;
+  const instrument = await instrumentDb.instrument.findFirst({
     where: { id: instrumentId, studyId },
     include: {
       fields: {
@@ -46,9 +44,10 @@ export const assertInstrumentBelongsToStudy = async (
 export const assertPublishedInstrumentBelongsToStudy = async (
   instrumentId: string,
   studyId: string,
-  db: TDbClient = prisma
+  db: unknown = prisma
 ) => {
-  const instrument = await db.instrument.findFirst({
+  const instrumentDb = db as Pick<typeof prisma, "instrument">;
+  const instrument = await instrumentDb.instrument.findFirst({
     where: { id: instrumentId, studyId, status: "PUBLISHED" },
     select: {
       id: true,

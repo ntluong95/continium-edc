@@ -50,6 +50,9 @@ yarn-error.log*
 /blob-report/
 /playwright/.cache/
 
+# Generated secrets — never commit
+deployment/*.DO-NOT-COMMIT.*
+
 # project specific
 packages/lib/uploads
 apps/web/public/js

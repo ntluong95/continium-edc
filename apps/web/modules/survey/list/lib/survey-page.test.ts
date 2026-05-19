@@ -15,6 +15,9 @@ vi.mock("@continium/database", () => ({
     survey: {
       findMany: vi.fn(),
     },
+    response: {
+      groupBy: vi.fn(),
+    },
   },
 }));
 
@@ -25,6 +28,15 @@ vi.mock("@continium/logger", () => ({
 }));
 
 const environmentId = "env_123";
+
+function mockResponseCounts(counts: Record<string, number> = {}) {
+  vi.mocked(prisma.response.groupBy).mockResolvedValue(
+    Object.entries(counts).map(([surveyId, count]) => ({
+      surveyId,
+      _count: { _all: count },
+    })) as never
+  );
+}
 
 function makeSurveyRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -37,7 +49,6 @@ function makeSurveyRow(overrides: Record<string, unknown> = {}) {
     updatedAt: new Date("2025-01-02T00:00:00.000Z"),
     creator: { name: "Alice" },
     singleUse: null,
-    _count: { responses: 3 },
     ...overrides,
   };
 }
@@ -74,6 +85,7 @@ describe("survey-page cursor helpers", () => {
 describe("getSurveyListPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResponseCounts();
   });
 
   test("uses a stable updatedAt order with a next cursor", async () => {
@@ -81,6 +93,7 @@ describe("getSurveyListPage", () => {
       makeSurveyRow({ id: "survey_2", updatedAt: new Date("2025-01-03T00:00:00.000Z") }),
       makeSurveyRow({ id: "survey_1", updatedAt: new Date("2025-01-02T00:00:00.000Z") }),
     ] as never);
+    mockResponseCounts({ survey_2: 3 });
 
     const page = await getSurveyListPage(environmentId, {
       limit: 1,

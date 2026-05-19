@@ -14,6 +14,8 @@ import { validateInputs } from "@/lib/utils/validate";
 import { evaluateResponseQuotas } from "@/modules/ee/quotas/lib/evaluation-service";
 import { getContact } from "./contact";
 
+type TResponseDbClient = Pick<typeof prisma, "response">;
+
 export const createResponseWithQuotaEvaluation = async (
   responseInput: TResponseInputV2
 ): Promise<TResponseWithQuotaFull> => {
@@ -86,7 +88,7 @@ const buildPrismaResponseData = (
 
 export const createResponse = async (
   responseInput: TResponseInputV2,
-  tx?: Prisma.TransactionClient
+  tx?: TResponseDbClient
 ): Promise<TResponse> => {
   validateInputs([responseInput, ZResponseInput]);
 
