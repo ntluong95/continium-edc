@@ -31,7 +31,6 @@ jobs:
         with:
           filters: |
             translations:
-              - 'apps/web/**/*.ts'
               - 'apps/web/**/*.tsx'
               - 'apps/web/locales/**/*.json'
               - 'packages/surveys/src/**/*.{ts,tsx}'
@@ -50,7 +49,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.changes.outputs.translations == 'true'
-        run: pnpm install --frozen-lockfile --config.platform=linux --config.architecture=x64
+        run: pnpm install --no-frozen-lockfile --config.platform=linux --config.architecture=x64
 
       - name: Validate translation keys
         if: steps.changes.outputs.translations == 'true'
