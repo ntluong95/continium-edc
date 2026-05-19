@@ -100,37 +100,44 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
   if (!subject) return null;
 
   const enrollment = subject.enrollments[0] ?? null;
-  let events = await prisma.event.findMany({
-    where: enrollment ? { armId: enrollment.armId } : { id: { in: [] } },
-    orderBy: { position: "asc" },
-    include: {
-      instruments: {
-        include: {
-          instrument: {
-            include: {
-              fields: { orderBy: { position: "asc" } },
-              survey: {
-                select: {
-                  id: true,
-                  name: true,
-                  type: true,
-                  status: true,
-                  welcomeCard: true,
-                  blocks: true,
-                  endings: true,
-                  hiddenFields: true,
-                  variables: true,
-                  styling: true,
-                  singleUse: true,
+
+  // Shared query for arm events — extracted so the re-fetch after
+  // ensurePublishedInstrumentFields can reuse the same shape without
+  // duplicating the include/select tree.
+  const fetchArmEvents = () =>
+    prisma.event.findMany({
+      where: enrollment ? { armId: enrollment.armId } : { id: { in: [] } },
+      orderBy: { position: "asc" },
+      include: {
+        instruments: {
+          include: {
+            instrument: {
+              include: {
+                fields: { orderBy: { position: "asc" } },
+                survey: {
+                  select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    status: true,
+                    welcomeCard: true,
+                    blocks: true,
+                    endings: true,
+                    hiddenFields: true,
+                    variables: true,
+                    styling: true,
+                    singleUse: true,
+                  },
                 },
               },
             },
           },
+          orderBy: { instrument: { displayName: "asc" } },
         },
-        orderBy: { instrument: { displayName: "asc" } },
       },
-    },
-  });
+    });
+
+  let events = await fetchArmEvents();
   let visibleEvents = events;
 
   const missingFieldInstrumentIds = visibleEvents.flatMap((event) =>
@@ -145,7 +152,7 @@ export const getSubjectDataEntry = async (environmentId: string, subjectId: stri
   );
 
   if ((await ensurePublishedInstrumentFields(missingFieldInstrumentIds)) > 0) {
-    events = await getEnrollmentEvents();
+    events = await fetchArmEvents();
     visibleEvents = events;
   }
 
