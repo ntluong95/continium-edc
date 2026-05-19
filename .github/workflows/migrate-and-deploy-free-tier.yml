@@ -43,7 +43,9 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # --no-frozen-lockfile so platform-specific optional binaries (e.g. rolldown)
+        # are installed even when the lockfile was generated on a different OS.
+        run: pnpm install --no-frozen-lockfile
 
       - name: Compile database package with turbo
         run: pnpm turbo run build --filter=@continium/database...

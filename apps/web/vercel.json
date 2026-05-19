@@ -1,4 +1,5 @@
 {
+  "crons": [],
   "functions": {
     "app/**/*.ts": {
       "maxDuration": 10,
@@ -13,5 +14,5 @@
       "memory": 200
     }
   },
-  "crons": []
+  "installCommand": "pnpm install --no-frozen-lockfile"
 }
