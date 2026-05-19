@@ -10,6 +10,22 @@ export const xmUserIdentification: MigrationScript = {
   id: "n2u5d3wmcw1t2h8a4vgfu2y9",
   name: "20241209104738_xm_user_identification",
   run: async ({ tx }) => {
+    // Guard: on a fresh DB the userId column may already be absent (dropped by a later schema migration).
+    // In that case there is nothing to migrate.
+    const [{ col_exists: colExists }] = await tx.$queryRaw<[{ col_exists: boolean }]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'Contact'
+        AND column_name = 'userId'
+      ) AS col_exists
+    `;
+
+    if (!colExists) {
+      logger.info("Contact.userId column does not exist — migration is a no-op on this database.");
+      return;
+    }
+
     // Check total contacts
     const [{ total_contacts: totalContacts }] = await tx.$queryRaw<[{ total_contacts: number }]>`
     SELECT COUNT(*) AS total_contacts FROM "Contact"
