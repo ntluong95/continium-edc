@@ -1,5 +1,5 @@
 import "server-only";
-import { Prisma } from "@prisma/client";
+import type { prisma } from "@continium/database";
 import { logger } from "@continium/logger";
 import { ZId } from "@continium/types/common";
 import { TJsEnvironmentStateSurvey } from "@continium/types/js";
@@ -8,6 +8,8 @@ import { TResponseData, TResponseVariables } from "@continium/types/responses";
 import { updateResponse } from "@/lib/response/service";
 import { evaluateLogic } from "@/lib/surveyLogic/utils";
 import { validateInputs } from "@/lib/utils/validate";
+
+type TQuotaDbClient = Pick<typeof prisma, "response" | "responseQuotaLink">;
 
 /**
  * Evaluates quotas against response data to determine screening status
@@ -59,7 +61,7 @@ export const upsertResponseQuotaLinks = async (
   fullQuota: TSurveyQuota[],
   otherQuota: TSurveyQuota[],
   failedQuotas: TSurveyQuota[],
-  tx: Prisma.TransactionClient
+  tx: TQuotaDbClient
 ): Promise<void> => {
   // remove records for quotas that failed
   await tx.responseQuotaLink.deleteMany({
@@ -123,7 +125,7 @@ export const handleQuotas = async (
   responseId: string,
   result: { passedQuotas: TSurveyQuota[]; failedQuotas: TSurveyQuota[] },
   responseFinished: boolean,
-  tx: Prisma.TransactionClient
+  tx: TQuotaDbClient
 ): Promise<TSurveyQuota | null> => {
   try {
     validateInputs([surveyId, ZId], [responseId, ZId]);

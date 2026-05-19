@@ -1,5 +1,5 @@
 import "server-only";
-import { Prisma, PrismaClient, Team } from "@prisma/client";
+import { Prisma, Team } from "@prisma/client";
 import { cache as reactCache } from "react";
 import { prisma } from "@continium/database";
 import { logger } from "@continium/logger";
@@ -7,15 +7,16 @@ import { DatabaseError } from "@continium/types/errors";
 import { getAccessFlags } from "@/lib/membership/utils";
 import { CreateMembershipInvite } from "@/modules/auth/signup/types/invites";
 
-type TTeamDbClient = PrismaClient | Prisma.TransactionClient;
+type TTeamDbClient = Pick<typeof prisma, "team" | "teamUser">;
 type TTeamMembershipTarget = Pick<Team, "id">;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TTeamDbClient => tx ?? prisma;
+const getDbClient = (tx?: TTeamDbClient): TTeamDbClient =>
+  (tx ?? prisma) as unknown as TTeamDbClient;
 
 const getTeamForOrganizationUncached = async (
   teamId: string,
   organizationId: string,
-  tx?: Prisma.TransactionClient
+  tx?: TTeamDbClient
 ): Promise<TTeamMembershipTarget | null> => {
   const team = await getDbClient(tx).team.findUnique({
     where: {
@@ -41,7 +42,7 @@ const getTeamForOrganizationCached = reactCache(async (teamId: string, organizat
 export const createTeamMembership = async (
   invite: CreateMembershipInvite,
   userId: string,
-  tx?: Prisma.TransactionClient
+  tx?: TTeamDbClient
 ): Promise<void> => {
   const teamIds = invite.teamIds || [];
 
@@ -89,7 +90,7 @@ export const createTeamMembership = async (
 export const getTeamForOrganization = async (
   teamId: string,
   organizationId: string,
-  tx?: Prisma.TransactionClient
+  tx?: TTeamDbClient
 ): Promise<TTeamMembershipTarget | null> => {
   if (tx) {
     return getTeamForOrganizationUncached(teamId, organizationId, tx);

@@ -12,6 +12,8 @@ import { ZResponseUpdateSchema } from "@/modules/api/v2/management/responses/[re
 import { ApiErrorResponseV2 } from "@/modules/api/v2/types/api-error";
 import { evaluateResponseQuotas } from "@/modules/ee/quotas/lib/evaluation-service";
 
+type TResponseDbClient = Pick<typeof prisma, "response">;
+
 export const getResponse = reactCache(async (responseId: string) => {
   try {
     const responsePrisma = await prisma.response.findUnique({
@@ -137,7 +139,7 @@ export const deleteResponse = async (responseId: string): Promise<Result<Respons
 export const updateResponse = async (
   responseId: string,
   responseInput: z.infer<typeof ZResponseUpdateSchema>,
-  tx?: Prisma.TransactionClient
+  tx?: TResponseDbClient
 ): Promise<Result<Response, ApiErrorResponseV2>> => {
   try {
     const prismaClient = tx ?? prisma;

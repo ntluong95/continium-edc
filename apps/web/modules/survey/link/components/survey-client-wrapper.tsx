@@ -62,6 +62,7 @@ export const SurveyClientWrapper = ({
   const searchParams = useSearchParams();
   const skipPrefilled = searchParams.get("skipPrefilled") === "true";
   const offlineSupport = searchParams.get("offlineSupport") === "true";
+  const jsSurvey = useMemo(() => toJsEnvironmentStateSurvey(survey), [survey]);
   const elements = useMemo(() => getElementsFromBlocks(survey.blocks), [survey.blocks]);
 
   const startAt = searchParams.get("startAt");
@@ -137,8 +138,8 @@ export const SurveyClientWrapper = ({
   // Determine text direction based on language code for logo positioning only
   // which checks both language code and survey content. This is only for logo UI positioning.
   const logoDir = useMemo(() => {
-    return isRTLLanguage(survey, languageCode) ? "rtl" : "auto";
-  }, [languageCode, survey]);
+    return isRTLLanguage(jsSurvey, languageCode) ? "rtl" : "auto";
+  }, [languageCode, jsSurvey]);
 
   return (
     <>
@@ -170,7 +171,7 @@ export const SurveyClientWrapper = ({
           appUrl={publicDomain}
           environmentId={survey.environmentId}
           isPreviewMode={isPreview}
-          survey={toJsEnvironmentStateSurvey(survey)}
+          survey={jsSurvey}
           styling={styling}
           languageCode={languageCode}
           isBrandingEnabled={project.linkSurveyBranding}

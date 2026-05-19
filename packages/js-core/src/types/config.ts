@@ -4,6 +4,7 @@ import type { ActionClass, Language, Project, Survey, SurveyLanguage } from "@pr
 export type TEnvironmentStateSurvey = Pick<
   Survey,
   | "id"
+  | "name"
   | "welcomeCard"
   | "questions"
   | "variables"

@@ -1,5 +1,5 @@
 import "server-only";
-import PostHog from "posthog-node";
+import { PostHog } from "posthog-node";
 import { POSTHOG_KEY } from "@/lib/constants";
 import type { TPostHogFeatureFlagContext, TPostHogFeatureFlagValue } from "./types";
 

@@ -17,6 +17,7 @@ export const buildClinicalSurveyForRenderer = (
 
   return {
     id: (raw.id as string) ?? "",
+    name: (raw.name as string) ?? "Clinical instrument",
     type: (raw.type as TJsEnvironmentStateSurvey["type"]) ?? "link",
     status: (raw.status as TJsEnvironmentStateSurvey["status"]) ?? "inProgress",
 

@@ -2,10 +2,12 @@
 
 > Single-page operator runbook. Tick each row as you go. Skip rows that don't apply (e.g. R2 deferred). Save the filled-in copy to the public repo as evidence of the smoke pass.
 
-**Last verified:** _<fill in date>_
-**Operator:** _<fill in name>_
-**Public URL:** _<fill in>_
-**License server URL:** _<fill in>_
+**Last verified:** 2026-05-19
+**Operator:** Codex + ntluong95 Vercel account
+**Public URL:** https://continium-edc.vercel.app
+**License server URL:** https://continium-license-server.vercel.app
+
+**Current status:** Vercel deployments are live, but DB-backed production smoke is blocked. EDC production DB env vars are still placeholder values. License server `/api/health` returns `{ "status": "degraded", "db": "down" }` until a hosted license Postgres URL is provisioned and migrated.
 
 ---
 
@@ -83,7 +85,7 @@
 - [ ] Worker strategy recorded: worker-backed flows explicitly deferred for $0 demo.
 - [ ] `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` saved as GitHub secrets.
 - [ ] `.github/workflows/migrate-and-deploy-free-tier.yml` committed.
-- [ ] First deploy succeeds (build log clean).
+- [x] First deploy succeeds (build log clean).
 - [ ] Migrations applied (`psql $DIRECT_URL -c "\dt"` lists expected tables).
 - [ ] `curl https://<app>.vercel.app/api/health` → 200.
 - [ ] No pg-boss worker created for the $0 demo; deferred worker-backed flows are listed in section 9.
@@ -110,8 +112,8 @@
 - [ ] Vercel project `continium-license-server` imported from private repo.
 - [ ] All env vars from `deployment/env.license-server.example` filled in Vercel Dashboard.
 - [ ] `CONTINIUM_LICENSE_ADMIN_TOKEN` is 32+ chars.
-- [ ] First deploy succeeds.
-- [ ] `curl https://<ls>.vercel.app/api/health` → `{ status: "ok", db: "up" }`.
+- [x] First deploy succeeds.
+- [ ] `curl https://<ls>.vercel.app/api/health` → `{ status: "ok", db: "up" }`. Blocked: hosted `LICENSE_DATABASE_URL` not provisioned.
 - [ ] Demo license seeded via current `POST /api/admin/licenses` route with Bearer token, unless route migration already landed.
 - [ ] License key saved to current `ENTERPRISE_LICENSE_KEY` in EDC env, unless Continium API-key rename already landed.
 - [ ] EDC env uses a valid `CONTINIUM_LICENSE_SERVER_URL`; `CONTINIUM_EDITION=cloud` only if code now supports it.
@@ -174,8 +176,8 @@
 
 ### 7.6 Security spot checks
 
-- [ ] TLS valid on every endpoint (`curl -I https://...`).
-- [ ] License admin endpoint returns 401 without Bearer token.
+- [x] TLS valid on every endpoint (`curl -I https://...`).
+- [x] License admin endpoint returns 401 without Bearer token.
 - [ ] Registration rate-limit fires after threshold.
 - [ ] No secrets in HTML / JS / network responses (DevTools spot-check).
 - [ ] `gitleaks` clean on both repos after smoke completes.
@@ -197,8 +199,8 @@ Public-share the URL only if **every Phase 1–7 row above is checked OR explici
 
 | Item              | Reason                           | Owner  | Next review |
 | ----------------- | -------------------------------- | ------ | ----------- |
-| _e.g. R2 uploads_ | _e.g. not needed for first demo_ | _name_ | _date_      |
-|                   |                                  |        |             |
+| Hosted Postgres smoke | Supabase EDC + license DB URLs are still placeholder/local, so registration/trial cannot pass yet | ntluong95 | 2026-05-19 |
+| R2 uploads | Not needed before first DB/auth smoke | ntluong95 | after DB smoke |
 |                   |                                  |        |             |
 
 ---

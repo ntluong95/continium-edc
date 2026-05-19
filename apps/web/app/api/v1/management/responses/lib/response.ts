@@ -56,6 +56,8 @@ export const responseSelection = {
   },
 } satisfies Prisma.ResponseSelect;
 
+type TResponseDbClient = Pick<typeof prisma, "response">;
+
 export const createResponseWithQuotaEvaluation = async (
   responseInput: TResponseInput
 ): Promise<TResponse> => {
@@ -88,7 +90,7 @@ export const createResponseWithQuotaEvaluation = async (
 
 export const createResponse = async (
   responseInput: TResponseInput,
-  tx?: Prisma.TransactionClient
+  tx?: TResponseDbClient
 ): Promise<TResponse> => {
   validateInputs([responseInput, ZResponseInput]);
 

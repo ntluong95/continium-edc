@@ -16,6 +16,8 @@ export const selectDisplay = {
   contactId: true,
 } satisfies Prisma.DisplaySelect;
 
+type TDisplayDbClient = Pick<typeof prisma, "display">;
+
 export const getDisplayCountBySurveyId = reactCache(
   async (surveyId: string, filters?: TDisplayFilters): Promise<number> => {
     validateInputs([surveyId, ZId], [filters, ZDisplayFilters.optional()]);
@@ -140,10 +142,10 @@ export const getDisplaysBySurveyIdWithContact = reactCache(
   }
 );
 
-export const deleteDisplay = async (displayId: string, tx?: Prisma.TransactionClient): Promise<TDisplay> => {
+export const deleteDisplay = async (displayId: string, tx?: TDisplayDbClient): Promise<TDisplay> => {
   validateInputs([displayId, ZId]);
   try {
-    const prismaClient = tx ?? prisma;
+    const prismaClient = (tx ?? prisma) as unknown as TDisplayDbClient;
     const display = await prismaClient.display.delete({
       where: {
         id: displayId,

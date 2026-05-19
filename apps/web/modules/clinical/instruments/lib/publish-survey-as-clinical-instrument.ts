@@ -24,13 +24,14 @@ const normalizeJson = (value: unknown) =>
   value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
 
 const createInstrumentFields = async (
-  tx: Prisma.TransactionClient,
+  tx: unknown,
   instrumentId: string,
   fields: TInstrumentSnapshotField[]
 ) => {
   if (fields.length === 0) return;
 
-  await tx.instrumentField.createMany({
+  const instrumentFieldDb = tx as Pick<typeof prisma, "instrumentField">;
+  await instrumentFieldDb.instrumentField.createMany({
     data: fields.map((field) => ({
       instrumentId,
       key: field.key,

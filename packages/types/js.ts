@@ -8,6 +8,7 @@ import { ZSurveyBase, surveyRefinement } from "./surveys/types";
 
 export const ZJsEnvironmentStateSurvey = ZSurveyBase.pick({
   id: true,
+  name: true,
   welcomeCard: true,
   questions: true,
   blocks: true,

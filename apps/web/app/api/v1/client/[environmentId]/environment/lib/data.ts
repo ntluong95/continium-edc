@@ -79,6 +79,7 @@ export const getEnvironmentStateData = async (environmentId: string): Promise<En
           take: 30, // Limit for performance
           select: {
             id: true,
+            name: true,
             welcomeCard: true,
             questions: true,
             blocks: true,

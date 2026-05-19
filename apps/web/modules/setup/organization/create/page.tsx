@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
 import { AuthenticationError } from "@continium/types/errors";
-import { IS_CONTINIUM_CLOUD } from "@/lib/constants";
+import { DISABLE_ACCOUNT_DELETION_SSO_REAUTH, IS_CONTINIUM_CLOUD } from "@/lib/constants";
 import { getHasNoOrganizations } from "@/lib/instance/service";
 import { getOrganizationsByUserId } from "@/lib/organization/service";
 import { getUser } from "@/lib/user/service";
@@ -38,7 +38,13 @@ export const CreateOrganizationPage = async () => {
   }
 
   if (userOrganizations.length === 0) {
-    return <RemovedFromOrganization user={user} isContiniumCloud={IS_CONTINIUM_CLOUD} />;
+    return (
+      <RemovedFromOrganization
+        user={user}
+        isContiniumCloud={IS_CONTINIUM_CLOUD}
+        disableSsoReauth={DISABLE_ACCOUNT_DELETION_SSO_REAUTH}
+      />
+    );
   }
 
   return notFound();

@@ -1,12 +1,13 @@
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@continium/database";
 import { TAccount, TAccountInput, ZAccountInput } from "@continium/types/account";
 import { DatabaseError } from "@continium/types/errors";
 import { validateInputs } from "../utils/validate";
 
-type TAccountDbClient = PrismaClient | Prisma.TransactionClient;
+type TAccountDbClient = Pick<typeof prisma, "account">;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TAccountDbClient => tx ?? prisma;
+const getDbClient = (tx?: TAccountDbClient): TAccountDbClient =>
+  (tx ?? prisma) as unknown as TAccountDbClient;
 
 export const createAccount = async (accountData: TAccountInput): Promise<TAccount> => {
   validateInputs([accountData, ZAccountInput]);
@@ -27,7 +28,7 @@ export const createAccount = async (accountData: TAccountInput): Promise<TAccoun
 
 export const upsertAccount = async (
   accountData: TAccountInput,
-  tx?: Prisma.TransactionClient
+  tx?: TAccountDbClient
 ): Promise<TAccount> => {
   const [validatedAccountData] = validateInputs([accountData, ZAccountInput]);
   const updateAccountData: Omit<TAccountInput, "userId" | "type" | "provider" | "providerAccountId"> = {

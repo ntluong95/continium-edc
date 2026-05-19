@@ -1,5 +1,5 @@
 import "server-only";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { cache as reactCache } from "react";
 import { prisma } from "@continium/database";
 import { logger } from "@continium/logger";
@@ -8,14 +8,15 @@ import { DatabaseError, UnknownError } from "@continium/types/errors";
 import { TMembership, ZMembership } from "@continium/types/memberships";
 import { validateInputs } from "../utils/validate";
 
-type TMembershipDbClient = PrismaClient | Prisma.TransactionClient;
+type TMembershipDbClient = Pick<typeof prisma, "membership">;
 
-const getDbClient = (tx?: Prisma.TransactionClient): TMembershipDbClient => tx ?? prisma;
+const getDbClient = (tx?: TMembershipDbClient): TMembershipDbClient =>
+  (tx ?? prisma) as unknown as TMembershipDbClient;
 
 const getMembershipByUserIdOrganizationIdUncached = async (
   userId: string,
   organizationId: string,
-  tx?: Prisma.TransactionClient
+  tx?: TMembershipDbClient
 ): Promise<TMembership | null> => {
   validateInputs([userId, ZString], [organizationId, ZString]);
 
@@ -49,7 +50,7 @@ const getMembershipByUserIdOrganizationIdCached = reactCache(async (userId: stri
 export const getMembershipByUserIdOrganizationId = async (
   userId: string,
   organizationId: string,
-  tx?: Prisma.TransactionClient
+  tx?: TMembershipDbClient
 ): Promise<TMembership | null> => {
   if (tx) {
     return getMembershipByUserIdOrganizationIdUncached(userId, organizationId, tx);
@@ -62,7 +63,7 @@ export const createMembership = async (
   organizationId: string,
   userId: string,
   data: Partial<TMembership>,
-  tx?: Prisma.TransactionClient
+  tx?: TMembershipDbClient
 ): Promise<TMembership> => {
   validateInputs([organizationId, ZString], [userId, ZString], [data, ZMembership.partial()]);
 
