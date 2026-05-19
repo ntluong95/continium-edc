@@ -29,8 +29,6 @@ jobs:
     name: EDC Prisma migrate deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # continue-on-error lets deploy proceed even when DB secrets are not yet set
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -61,8 +59,6 @@ jobs:
   deploy-edc:
     name: EDC Vercel deploy
     needs: migrate-edc
-    # always run - migration is best-effort; never block deploy on missing DB secrets
-    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -83,17 +79,28 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
+      - name: Sync database env vars to Vercel
+        run: |
+          vercel env add DATABASE_URL production --force --yes --value "$DATABASE_URL" --token=${{ secrets.VERCEL_TOKEN }}
+          vercel env add DIRECT_URL production --force --yes --value "$DIRECT_URL" --token=${{ secrets.VERCEL_TOKEN }}
+          vercel env add JOBS_DATABASE_URL production --force --yes --value "$JOBS_DATABASE_URL" --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          JOBS_DATABASE_URL: ${{ secrets.JOBS_DATABASE_URL }}
+
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Inject database env vars for build
-        # DATABASE_URL and JOBS_DATABASE_URL are not in Vercel project settings;
-        # append them to the pulled env file so vercel build / next build can validate them.
+        # Sensitive Vercel env vars are blank after pull; append CI secrets for local prebuild.
         run: |
           printf 'DATABASE_URL=%s\n' "$DATABASE_URL" >> .vercel/.env.production.local
+          printf 'DIRECT_URL=%s\n' "$DIRECT_URL" >> .vercel/.env.production.local
           printf 'JOBS_DATABASE_URL=%s\n' "$JOBS_DATABASE_URL" >> .vercel/.env.production.local
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
           JOBS_DATABASE_URL: ${{ secrets.JOBS_DATABASE_URL }}
 
       - name: Build project with Vercel
