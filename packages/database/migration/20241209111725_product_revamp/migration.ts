@@ -15,39 +15,51 @@ export const productRevamp: MigrationScript = {
   id: "wq3b8pvrvm70nzmsg2647olq",
   name: "20241209111725_product_revamp",
   run: async ({ tx }) => {
-    // Your migration script goes here
+    // Guard: billing JSONB column was removed from Organization in a later schema migration
+    // (moved to OrganizationBilling). Skip billing update if it no longer exists.
+    const columnCheck = await tx.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'Organization' AND column_name = 'billing'
+      ) AS exists
+    `;
 
-    const organizations = await tx.$queryRaw<
-      {
-        id: string;
-        billing: {
-          plan: Plan;
-          limits: {
-            monthly: {
-              responses: number;
-              miu: number;
+    if (columnCheck[0]?.exists) {
+      const organizations = await tx.$queryRaw<
+        {
+          id: string;
+          billing: {
+            plan: Plan;
+            limits: {
+              monthly: {
+                responses: number;
+                miu: number;
+              };
+              projects: number | null;
             };
-            projects: number | null;
           };
+        }[]
+      >`SELECT id, billing FROM "Organization" WHERE (billing->'limits'->>'projects') IS NULL`;
+
+      const updateOrganizationPromises = organizations.map((org) => {
+        const updatedBilling = {
+          ...org.billing,
+          limits: {
+            ...org.billing.limits,
+            projects: projectsLimitByPlan[org.billing.plan],
+          },
         };
-      }[]
-    >`SELECT id, billing FROM "Organization" WHERE (billing->'limits'->>'projects') IS NULL`;
 
-    const updateOrganizationPromises = organizations.map((org) => {
-      const updatedBilling = {
-        ...org.billing,
-        limits: {
-          ...org.billing.limits,
-          projects: projectsLimitByPlan[org.billing.plan],
-        },
-      };
+        return tx.$executeRaw`UPDATE "Organization" SET billing = ${updatedBilling}::jsonb WHERE id = ${org.id}`;
+      });
 
-      return tx.$executeRaw`UPDATE "Organization" SET billing = ${updatedBilling}::jsonb WHERE id = ${org.id}`;
-    });
-
-    await Promise.all(updateOrganizationPromises);
-
-    logger.info(`Updated ${updateOrganizationPromises.length.toString()} organizations`);
+      await Promise.all(updateOrganizationPromises);
+      logger.info(`Updated ${updateOrganizationPromises.length.toString()} organizations`);
+    } else {
+      logger.info(
+        "Organization.billing column not found (moved to OrganizationBilling). Skipping org billing update."
+      );
+    }
 
     const updatedEmptyConfigProjects: number | undefined = await tx.$executeRaw`
           UPDATE "Project"

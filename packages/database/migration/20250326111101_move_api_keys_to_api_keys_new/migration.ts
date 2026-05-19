@@ -5,9 +5,24 @@ export const moveApiKeysToApiKeysNew: MigrationScript = {
   id: "mvwdryxrxaf8rhr97g2zlv3m",
   name: "20250326111101_move_api_keys_to_api_keys_new",
   run: async ({ tx }) => {
+    // Guard: ApiKey.environmentId was removed in a later schema migration (ApiKeyNew was
+    // renamed to ApiKey). Skip on fresh DBs where the old structure no longer exists.
+    const colCheck = await tx.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'ApiKey' AND column_name = 'environmentId'
+      ) AS exists
+    `;
+    if (!colCheck[0]?.exists) {
+      console.log(
+        "ApiKey.environmentId not found (old schema gone). Skipping move_api_keys_to_api_keys_new."
+      );
+      return;
+    }
+
     // Step 1: Get all existing API keys with related data
     const apiKeys = await tx.$queryRaw`
-      SELECT 
+      SELECT
         ak.*,
         e.id as "environmentId",
         p.id as "projectId",

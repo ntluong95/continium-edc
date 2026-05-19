@@ -6,13 +6,27 @@ export const removedNewSessionEvent: MigrationScript = {
   id: "dnh52k9vepinuhwuur8fclqf",
   name: "20250211050118_removed_new_session_event",
   run: async ({ tx }) => {
+    // Guard: 'automatic' was removed from the ActionType enum in a later schema migration.
+    // Skip on fresh DBs where the enum value no longer exists.
+    const enumCheck = await tx.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_enum e
+        JOIN pg_type t ON t.oid = e.enumtypid
+        WHERE t.typname = 'ActionType' AND e.enumlabel = 'automatic'
+      ) AS exists
+    `;
+    if (!enumCheck[0]?.exists) {
+      logger.info("ActionType enum value 'automatic' not found (removed by later migration). Skipping.");
+      return;
+    }
+
     const updatedActions = await tx.$executeRaw`
       UPDATE "ActionClass"
       SET type = 'noCode',
           "noCodeConfig" = '{"type":"pageView","urlFilters":[]}'::jsonb
       WHERE type = 'automatic'
         AND EXISTS (
-          SELECT 1 
+          SELECT 1
           FROM "SurveyTrigger"
           WHERE "actionClassId" = "ActionClass".id
         )
@@ -25,7 +39,7 @@ export const removedNewSessionEvent: MigrationScript = {
       DELETE FROM "ActionClass"
       WHERE type = 'automatic'
         AND NOT EXISTS (
-          SELECT 1 
+          SELECT 1
           FROM "SurveyTrigger"
           WHERE "actionClassId" = "ActionClass".id
         )

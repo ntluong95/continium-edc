@@ -36,7 +36,19 @@ export const updateOrgLimits: MigrationScript = {
   id: "ax4otbz2f295rit6kn1jeu8l",
   name: "20241209111525_update_org_limits",
   run: async ({ tx }) => {
-    // Your migration script goes here
+    // Guard: billing JSONB column was removed from Organization in a later schema migration
+    // (moved to OrganizationBilling). Skip if it no longer exists.
+    const columnCheck = await tx.$queryRaw<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'Organization' AND column_name = 'billing'
+      ) AS exists
+    `;
+    if (!columnCheck[0]?.exists) {
+      logger.info("Organization.billing column not found (moved to OrganizationBilling). Skipping.");
+      return;
+    }
+
     // Find organizations that need updates
     const organizations = await tx.$queryRaw<TOrganization[]>`
       SELECT id, billing
