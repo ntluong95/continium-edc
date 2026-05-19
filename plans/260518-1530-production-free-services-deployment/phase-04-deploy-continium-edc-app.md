@@ -146,6 +146,9 @@ Repo-level config:
 ## Success criteria
 
 - [x] Public URL serves the landing page over HTTPS.
+- [x] CI/CD workflow committed and Vercel auto-deploy disabled.
+- [ ] GitHub secrets set (`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `DATABASE_URL`, `DIRECT_URL`).
+- [ ] Migrations applied on first successful CI run.
 - [ ] `/api/health` returns 200.
 - [ ] User can register → verify → log in → create org → create project → invite teammate → submit a normal form response.
 - [ ] Deferred worker-backed flows are documented and not part of the public demo acceptance gate.

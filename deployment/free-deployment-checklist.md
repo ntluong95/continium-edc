@@ -83,8 +83,14 @@
 - [ ] `CONTINIUM_EDITION=selfHosted` initially.
 - [ ] Brevo SMTP configured; Vercel Hobby can use SMTP 587 with the current `nodemailer` path.
 - [ ] Worker strategy recorded: worker-backed flows explicitly deferred for $0 demo.
-- [ ] `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` saved as GitHub secrets.
-- [ ] `.github/workflows/migrate-and-deploy-free-tier.yml` committed.
+- [x] `.github/workflows/migrate-and-deploy-free-tier.yml` committed.
+- [x] `continium/vercel.json` disables Vercel auto-deploy from GitHub (prevents double-build conflict).
+- [ ] GitHub secrets set (repo → Settings → Secrets and variables → Actions):
+  - `VERCEL_TOKEN` — create at vercel.com/account/tokens
+  - `VERCEL_ORG_ID` = `team_R3XUO311oudUwaeX8fWTnHY3`
+  - `VERCEL_PROJECT_ID` = `prj_SKY5qAqVC9YJRpaa45Lw6JjxxFgH`
+  - `DATABASE_URL` — Supabase EDC pooler URL (same as Vercel env var)
+  - `DIRECT_URL` — Supabase EDC direct URL (same as Vercel env var)
 - [x] First deploy succeeds (build log clean).
 - [ ] Migrations applied (`psql $DIRECT_URL -c "\dt"` lists expected tables).
 - [ ] `curl https://<app>.vercel.app/api/health` → 200.
