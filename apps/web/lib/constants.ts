@@ -61,7 +61,8 @@ export const SAML_PRODUCT = "continium";
 export const SAML_AUDIENCE = "https://saml.continium.com";
 export const SAML_PATH = "/api/auth/saml/callback";
 
-export const SIGNUP_ENABLED = IS_CONTINIUM_CLOUD || IS_DEVELOPMENT || E2E_TESTING;
+export const SIGNUP_ENABLED =
+  IS_CONTINIUM_CLOUD || IS_DEVELOPMENT || E2E_TESTING || env.SIGNUP_ENABLED === "1";
 export const EMAIL_AUTH_ENABLED = env.EMAIL_AUTH_DISABLED !== "1";
 export const INVITE_DISABLED = env.INVITE_DISABLED === "1";
 
